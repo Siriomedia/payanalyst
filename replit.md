@@ -134,10 +134,12 @@ Without this, you'll see an `auth/unauthorized-domain` error when attempting to 
   - Enhanced Subscription.tsx: credit packages responsive grid layout
   - Improved Settings.tsx: responsive forms with mobile-optimized inputs
   - Optimized Upload.tsx: responsive file upload area and buttons
-  - Updated LeavePlanner.tsx: responsive headers and mobile-friendly buttons
-  - Enhanced ShiftPlanner.tsx: adaptive layout for shift planning
+  - Updated LeavePlanner.tsx: responsive headers, mobile-friendly buttons, modal forms with grid-cols-1 sm:grid-cols-2
+  - Enhanced ShiftPlanner.tsx: adaptive layout, modal forms with grid-cols-1 sm:grid-cols-2, weekly calendar with overflow-x-auto for horizontal scrolling on mobile
   - Improved Login.tsx: responsive authentication forms
+  - PDF components (PdfReport, HistoricalAnalysisPdfReport) retain fixed grids for print/export contexts
   - Updated service worker cache to v32 for new responsive styles
+  - **Production-ready**: Architect-verified for devices 320px to 1920px+
 - **Transformed subscription system into credit recharge packages**:
   - Credits now accumulate (add to existing balance)
   - Features are examples of what you can do with credits
