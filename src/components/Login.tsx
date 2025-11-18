@@ -171,9 +171,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                 <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
                     
                     <div className="flex flex-col items-center mb-6">
-                        <div className="flex items-center space-x-3 text-blue-600 mb-4">
+                        <div className="flex items-center space-x-2 sm:space-x-3 text-blue-600 mb-4">
                             <LogoIcon />
-                            <span className="font-bold text-3xl">GioIA</span>
+                            <span className="font-bold text-2xl sm:text-3xl">GioIA</span>
                         </div>
                         <h2 className="text-xl font-bold text-gray-800">
                             {isSignUp ? 'Crea Account' : 'Accedi con Email'}
@@ -291,9 +291,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center">
                 
                 <div className="flex flex-col items-center mb-8">
-                    <div className="flex items-center space-x-3 text-blue-600 mb-4">
+                    <div className="flex items-center space-x-2 sm:space-x-3 text-blue-600 mb-4">
                         <LogoIcon />
-                        <span className="font-bold text-4xl">GioIA</span>
+                        <span className="font-bold text-3xl sm:text-4xl">GioIA</span>
                     </div>
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">Benvenuto!</h1>
                     <p className="text-gray-600">

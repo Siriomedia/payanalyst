@@ -237,10 +237,10 @@ const ShiftPlanner: React.FC<ShiftPlannerProps> = ({ shifts, onSave, onDelete, a
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6 print:hidden">
-                <h1 className="text-3xl font-bold text-gray-800">Pianifica Turni e Assenze</h1>
-                <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                    <PdfIcon className="w-5 h-5 mr-2"/> Stampa Riepilogo Settimana
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6 print:hidden">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Pianifica Turni e Assenze</h1>
+                <button onClick={() => window.print()} className="flex items-center justify-center px-3 sm:px-4 py-2 text-sm sm:text-base bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
+                    <PdfIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2"/> <span className="hidden sm:inline">Stampa Riepilogo Settimana</span><span className="sm:hidden">Stampa</span>
                 </button>
             </div>
             

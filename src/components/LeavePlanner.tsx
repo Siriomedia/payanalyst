@@ -89,14 +89,14 @@ const LeavePlanner: React.FC<LeavePlannerProps> = ({ leavePlans, onSave, onDelet
     
     return (
         <div>
-            <div className="flex justify-between items-center mb-6 print:hidden">
-                <h1 className="text-3xl font-bold text-gray-800">Pianifica Ferie e ROL</h1>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6 print:hidden">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Pianifica Ferie e ROL</h1>
                 <div className="flex gap-2">
-                    <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 transition-colors">
-                        <PdfIcon className="w-5 h-5 mr-2"/> Stampa Riepilogo
+                    <button onClick={() => window.print()} className="flex items-center justify-center px-3 sm:px-4 py-2 text-sm sm:text-base bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 transition-colors">
+                        <PdfIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2"/> <span className="hidden sm:inline">Stampa</span>
                     </button>
-                    <button onClick={handleAddNew} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-                        + Aggiungi Periodo
+                    <button onClick={handleAddNew} className="px-3 sm:px-4 py-2 text-sm sm:text-base bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors whitespace-nowrap">
+                        + <span className="hidden sm:inline">Aggiungi Periodo</span><span className="sm:hidden">Aggiungi</span>
                     </button>
                 </div>
             </div>
