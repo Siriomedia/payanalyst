@@ -18,9 +18,17 @@ GioIA is an Italian payslip analysis tool that uses Google's Gemini AI to analyz
 - Historical salary analysis with charts
 - Shift planning and tracking
 - Leave planner
-- Subscription/credit system
+- **Credit recharge system** with PayPal integration
 - Admin panel
 - PDF report generation
+
+### Credit System
+The app uses a credit-based system:
+- Credits are purchased in packages (not subscriptions)
+- Credits **accumulate** - they add to your existing balance
+- Credits never expire
+- No automatic renewals
+- PayPal payment integration for secure transactions
 
 ## Configuration
 
@@ -78,6 +86,13 @@ Without this, you'll see an `auth/unauthorized-domain` error when attempting to 
 - Created index.css for basic styling
 - Set up development workflow
 - Configured deployment for autoscale with build and preview
+- **Transformed subscription system into credit recharge packages**:
+  - Credits now accumulate (add to existing balance)
+  - Features are examples of what you can do with credits
+  - Removed all references to "monthly" and "renewal"
+  - Added "Most convenient" badge to Professional package
+  - Enhanced PayPal payment confirmation messages
+  - Added informative section explaining how credits work
 
 ## Running the Application
 The development server is configured to run automatically on port 5000.

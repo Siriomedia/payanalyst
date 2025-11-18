@@ -51,20 +51,26 @@ const Subscription: React.FC<SubscriptionProps> = ({ user, onPlanChange, onAddCr
                     },
 
                     onApprove: async (data: any, actions: any) => {
-                        await actions.order.capture();
+                        const orderDetails = await actions.order.capture();
+
+                        console.log('Pagamento completato:', orderDetails);
 
                         const creditsToAdd = PLANS[planKey].credits;
 
-                        // Aggiunge crediti
+                        // Aggiunge crediti al saldo esistente
                         onAddCredits(creditsToAdd);
 
-                        // Aggiorna piano utente
+                        // Aggiorna piano utente (per tracking)
                         onPlanChange(planKey);
 
                         alert(
-                            `Pagamento effettuato! 
-Hai attivato il piano ${PLANS[planKey].name}.
-Crediti aggiunti: ${creditsToAdd}`
+                            `✅ Pagamento completato con successo! 
+                            
+Pacchetto: ${PLANS[planKey].name}
+Crediti aggiunti: ${creditsToAdd}
+Nuovo saldo: ${user.credits + creditsToAdd} crediti
+
+Grazie per il tuo acquisto!`
                         );
                     },
 
@@ -81,9 +87,9 @@ Crediti aggiunti: ${creditsToAdd}`
         <div>
             {/* --- TITOLO --- */}
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold text-gray-800">Scegli il tuo piano</h1>
+                <h1 className="text-4xl font-bold text-gray-800">Pacchetti Ricarica Crediti</h1>
                 <p className="text-lg text-gray-500 mt-4 max-w-2xl mx-auto">
-                    I piani ti assegnano un pacchetto di crediti una tantum. Nessun abbonamento, nessun rinnovo.
+                    Acquista pacchetti di crediti che si aggiungono al tuo saldo attuale. Nessun abbonamento, nessun rinnovo automatico.
                 </p>
             </div>
 
@@ -97,12 +103,17 @@ Crediti aggiunti: ${creditsToAdd}`
                         <div
                             key={plan.name}
                             className={`border-2 ${
-                                isCurrentPlan ? plan.accentColor : "border-gray-200"
-                            } rounded-xl shadow-lg p-8 flex flex-col`}
+                                planKey === 'professional' ? 'border-blue-500 bg-blue-50' : "border-gray-200"
+                            } rounded-xl shadow-lg p-8 flex flex-col relative`}
                         >
+                            {planKey === 'professional' && (
+                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                                    Più conveniente
+                                </div>
+                            )}
                             <h2
                                 className={`text-2xl font-bold ${
-                                    isCurrentPlan ? "text-blue-600" : "text-gray-800"
+                                    planKey === 'professional' ? "text-blue-600" : "text-gray-800"
                                 }`}
                             >
                                 {plan.name}
@@ -126,12 +137,10 @@ Crediti aggiunti: ${creditsToAdd}`
                             </ul>
 
                             {planKey === "free" ? (
-                                <button
-                                    disabled
-                                    className="w-full mt-auto py-3 px-6 font-bold rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed"
-                                >
-                                    Piano Gratuito
-                                </button>
+                                <div className="w-full mt-auto py-3 px-6 text-center font-medium text-gray-600 bg-gray-100 rounded-lg">
+                                    <div className="text-sm">Saldo attuale:</div>
+                                    <div className="text-2xl font-bold text-blue-600">{user.credits} crediti</div>
+                                </div>
                             ) : (
                                 <>
                                     <div id={`paypal-btn-plan-${planKey}`} className="mt-4"></div>
@@ -143,8 +152,14 @@ Crediti aggiunti: ${creditsToAdd}`
             </div>
 
             {/* --- NOTA --- */}
-            <div className="text-center text-sm text-gray-500 mt-12">
-                I crediti dei piani si sommano a quelli già presenti nel tuo account.
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-12 max-w-3xl mx-auto">
+                <h3 className="font-bold text-gray-800 mb-2">ℹ️ Come funzionano i crediti</h3>
+                <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• I crediti acquistati si <strong>aggiungono</strong> al tuo saldo attuale</li>
+                    <li>• Non scadono e non si rinnovano automaticamente</li>
+                    <li>• Puoi acquistare più pacchetti quando vuoi</li>
+                    <li>• Pagamento sicuro tramite PayPal</li>
+                </ul>
             </div>
         </div>
     );

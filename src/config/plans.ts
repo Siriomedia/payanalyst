@@ -8,10 +8,10 @@ export const PLANS: Record<Plan, { name: string; price: number; credits: number;
     description: 'Ideale per testare l\'app e per curiosità.',
     accentColor: 'border-gray-300',
     features: [
-        '10 crediti/mese', 
-        'Tutte le funzionalità abilitate',
-        'Esempio: 1 analisi + 5 domande', 
-        'Scadenza mensile'
+        '10 crediti alla registrazione', 
+        'Esempio: 1 analisi + 5 domande all\'assistente',
+        'Esempio: 2 analisi storiche',
+        'I crediti non scadono'
     ]
   },
   basic: {
@@ -21,10 +21,10 @@ export const PLANS: Record<Plan, { name: string; price: number; credits: number;
     description: 'Per chi usa l\'app in modo saltuario ma vuole risultati completi.',
     accentColor: 'border-blue-500',
     features: [
-        '20 crediti/mese', 
-        'Tutte le funzionalità abilitate',
+        '20 crediti nel pacchetto', 
         'Esempio: 1 analisi storica completa',
-        'Rinnovo mensile'
+        'Esempio: 4 analisi buste paga',
+        'I crediti si aggiungono al saldo attuale'
     ]
   },
   medium: {
@@ -34,10 +34,10 @@ export const PLANS: Record<Plan, { name: string; price: number; credits: number;
     description: 'Per liberi professionisti o utenti che fanno 2-3 analisi al mese.',
     accentColor: 'border-purple-500',
     features: [
-        '50 crediti/mese', 
-        'Tutte le funzionalità abilitate',
+        '50 crediti nel pacchetto', 
         'Esempio: 2 analisi storiche + 1 confronto',
-        'Rinnovo mensile'
+        'Esempio: 10 analisi buste paga',
+        'I crediti si aggiungono al saldo attuale'
     ]
   },
   premium: {
@@ -47,10 +47,10 @@ export const PLANS: Record<Plan, { name: string; price: number; credits: number;
     description: 'Perfetto per un uso regolare e per chi gestisce più buste paga.',
     accentColor: 'border-orange-500',
     features: [
-        '70 crediti/mese', 
-        'Tutte le funzionalità abilitate',
+        '70 crediti nel pacchetto', 
         'Esempio: 3 analisi storiche + 1 confronto',
-        'Rinnovo mensile'
+        'Esempio: 14 analisi buste paga',
+        'I crediti si aggiungono al saldo attuale'
     ]
   },
   professional: {
@@ -60,10 +60,10 @@ export const PLANS: Record<Plan, { name: string; price: number; credits: number;
     description: 'Per consulenti, responsabili HR e uso quotidiano intensivo.',
     accentColor: 'border-red-500',
     features: [
-        '150 crediti/mese', 
-        'Tutte le funzionalità abilitate',
+        '150 crediti nel pacchetto', 
         'Esempio: 5 analisi storiche + 5 confronti',
-        'Ricariche sempre disponibili'
+        'Esempio: 30 analisi buste paga',
+        'I crediti si aggiungono al saldo attuale'
     ]
   },
 };
