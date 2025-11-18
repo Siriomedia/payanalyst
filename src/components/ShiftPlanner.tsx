@@ -257,46 +257,48 @@ const ShiftPlanner: React.FC<ShiftPlannerProps> = ({ shifts, onSave, onDelete, a
                      <p>{weekStart.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} - {weekEnd.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                 </div>
 
-                <div className="grid grid-cols-7 gap-1 md:gap-2">
-                    {weekDays.map(day => (
-                        <div key={day.toISOString()} className="text-center font-bold py-2 border-b-2 border-gray-200 text-sm md:text-base">
-                           {day.toLocaleDateString('it-IT', { weekday: 'short' })}
-                        </div>
-                    ))}
-                    {weekDays.map(day => {
-                        const dateStr = day.toISOString().split('T')[0];
-                        const entry = entriesByDate[dateStr];
-                        const isToday = new Date().toISOString().split('T')[0] === dateStr;
-
-                        return (
-                            <div
-                                key={dateStr}
-                                onClick={() => handleCellClick(day, entry)}
-                                className="border border-gray-200 rounded-lg min-h-[120px] p-1.5 flex flex-col cursor-pointer hover:bg-blue-50 transition-colors"
-                            >
-                                <div className={`font-semibold text-sm ${isToday ? 'text-blue-600' : 'text-gray-600'}`}>
-                                    {day.getDate()}
-                                </div>
-                                {entry ? (
-                                    'intervals' in entry ? ( // It's a Shift
-                                        <div className="mt-1 text-xs bg-blue-100 p-2 rounded-md text-blue-800 flex-grow space-y-1">
-                                            {entry.intervals.map(i => (
-                                                <p key={i.id} className="font-bold">{i.startTime} - {i.endTime}</p>
-                                            ))}
-                                            <p className="mt-1 truncate italic">{entry.notes}</p>
-                                        </div>
-                                    ) : ( // It's an Absence
-                                         <div className={`mt-1 text-xs p-2 rounded-md flex-grow flex flex-col justify-center items-center text-center ${ABSENCE_COLORS[entry.reason]}`}>
-                                            <p className="font-bold">{entry.reason}</p>
-                                            <p className="mt-1 truncate italic">{entry.notes}</p>
-                                        </div>
-                                    )
-                                ) : (
-                                    <div className="flex-grow"></div>
-                                )}
+                <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+                    <div className="grid grid-cols-7 gap-1 md:gap-2 min-w-[640px]">
+                        {weekDays.map(day => (
+                            <div key={day.toISOString()} className="text-center font-bold py-2 border-b-2 border-gray-200 text-sm md:text-base">
+                               {day.toLocaleDateString('it-IT', { weekday: 'short' })}
                             </div>
-                        );
-                    })}
+                        ))}
+                        {weekDays.map(day => {
+                            const dateStr = day.toISOString().split('T')[0];
+                            const entry = entriesByDate[dateStr];
+                            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+                            return (
+                                <div
+                                    key={dateStr}
+                                    onClick={() => handleCellClick(day, entry)}
+                                    className="border border-gray-200 rounded-lg min-h-[120px] p-1.5 flex flex-col cursor-pointer hover:bg-blue-50 transition-colors"
+                                >
+                                    <div className={`font-semibold text-sm ${isToday ? 'text-blue-600' : 'text-gray-600'}`}>
+                                        {day.getDate()}
+                                    </div>
+                                    {entry ? (
+                                        'intervals' in entry ? ( // It's a Shift
+                                            <div className="mt-1 text-xs bg-blue-100 p-2 rounded-md text-blue-800 flex-grow space-y-1">
+                                                {entry.intervals.map(i => (
+                                                    <p key={i.id} className="font-bold">{i.startTime} - {i.endTime}</p>
+                                                ))}
+                                                <p className="mt-1 truncate italic">{entry.notes}</p>
+                                            </div>
+                                        ) : ( // It's an Absence
+                                             <div className={`mt-1 text-xs p-2 rounded-md flex-grow flex flex-col justify-center items-center text-center ${ABSENCE_COLORS[entry.reason]}`}>
+                                                <p className="font-bold">{entry.reason}</p>
+                                                <p className="mt-1 truncate italic">{entry.notes}</p>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="flex-grow"></div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
             
