@@ -21,7 +21,6 @@ export interface User {
     placeOfBirth: string;
     role: 'admin' | 'user';
     taxId?: string;
-    password?: string;
     plan: Plan;
     credits: number;
     creditResetDate: string; // ISO string

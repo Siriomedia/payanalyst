@@ -57,6 +57,8 @@ To make a user an admin:
 ### Firebase Configuration
 Firebase configuration is included in `src/firebase.ts`. The Firebase client API keys are safe to expose in client-side code as Firebase uses security rules to protect data.
 
+**Authentication**: The app uses ONLY Firebase Google Sign-In. There are no alternative login methods.
+
 **Important**: To enable Google Sign-In on Replit, you must add the Replit domain to Firebase's authorized domains:
 1. Go to the [Firebase Console](https://console.firebase.google.com)
 2. Select your project (gioia-e1f29)
@@ -114,6 +116,14 @@ Without this, you'll see an `auth/unauthorized-domain` error when attempting to 
   - User account deletion (with admin protection)
   - User statistics and role management
   - Protected access (admin role required)
+  - Admin users have infinite credits (∞)
+- **Simplified authentication to Firebase-only**:
+  - Removed all alternative authentication methods
+  - Removed admin login with email/password
+  - Removed hardcoded admin email check
+  - Authentication is ONLY via Firebase Google Sign-In
+  - Admin role managed exclusively through Firebase Firestore
+  - Removed `password` field from User type
 
 ## Running the Application
 The development server is configured to run automatically on port 5000.
