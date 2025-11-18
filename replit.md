@@ -43,13 +43,14 @@ The app uses a credit-based system:
 
 ### Admin Panel (Admin Users Only)
 Users with `role: 'admin'` in Firebase have access to a comprehensive admin panel with:
-- **Real-time user monitoring**: See all registered users with live updates
+- **Real-time user monitoring**: See all registered users with live updates via onSnapshot
+- **Chronological ordering**: Users displayed in registration order (oldest to newest) using `createdAt` timestamp
 - **Credit management**: Two modes for safe operations:
   - **🔧 Imposta** (Set): Set absolute credit value (for both adding and removing)
   - **🎁 Regala** (Gift): Atomic increment for adding credits only (race-condition safe)
 - **Account deletion**: Remove user accounts (admin accounts are protected)
 - **User statistics**: View total users, admin count, and user distribution
-- **Full user details**: View email, plan, credits, role, and personal info
+- **Full user details**: View email, plan, credits, role, and personal info (all visible on mobile)
 - **Infinite credits**: Admin users have unlimited credits (∞) and can use all features without costs
 - **Always-visible credit display**: Credits shown in top-right header with 💎 icon
 
