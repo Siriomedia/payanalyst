@@ -90,8 +90,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, isOpen, setIsOpen, isCollapsed,
                             >
                                <div className="flex items-center text-sm font-semibold text-gray-700">
                                    <SparklesIcon className="w-5 h-5 mr-2 text-yellow-500" />
-                                   Crediti Residui: {user.credits}
+                                   Crediti Residui: {user.role === 'admin' ? '∞' : user.credits}
                                </div>
+                               {user.role === 'admin' && (
+                                   <p className="text-xs text-blue-600 mt-1 font-semibold">🔐 Admin - Crediti Illimitati</p>
+                               )}
                                <p className="text-xs text-gray-500 mt-1">Piano: {PLANS[user.plan].name}. Clicca per gestire.</p>
                             </div>
                         </div>

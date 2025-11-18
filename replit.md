@@ -19,7 +19,7 @@ GioIA is an Italian payslip analysis tool that uses Google's Gemini AI to analyz
 - Shift planning and tracking
 - Leave planner
 - **Credit recharge system** with PayPal integration
-- Admin panel
+- **Admin panel** with real-time user management
 - PDF report generation
 
 ### Credit System
@@ -29,6 +29,20 @@ The app uses a credit-based system:
 - Credits never expire
 - No automatic renewals
 - PayPal payment integration for secure transactions
+
+### Admin Panel (Admin Users Only)
+Users with `role: 'admin'` in Firebase have access to a comprehensive admin panel with:
+- **Real-time user monitoring**: See all registered users with live updates
+- **Credit management**: Modify any user's credit balance in real-time
+- **Account deletion**: Remove user accounts (admin accounts are protected)
+- **User statistics**: View total users, admin count, and user distribution
+- **Full user details**: View email, plan, credits, role, and personal info
+- **Infinite credits**: Admin users have unlimited credits and can use all features without costs
+
+To make a user an admin:
+1. Go to Firebase Console → Firestore Database
+2. Find the user's document in the `users` collection
+3. Set the `role` field to `'admin'`
 
 ## Configuration
 
@@ -93,6 +107,13 @@ Without this, you'll see an `auth/unauthorized-domain` error when attempting to 
   - Added "Most convenient" badge to Professional package
   - Enhanced PayPal payment confirmation messages
   - Added informative section explaining how credits work
+  - Completely recreated Subscription.tsx component for cache clearing
+- **Implemented comprehensive Admin Panel**:
+  - Real-time user list from Firebase with automatic updates
+  - Credit editing functionality for any user
+  - User account deletion (with admin protection)
+  - User statistics and role management
+  - Protected access (admin role required)
 
 ## Running the Application
 The development server is configured to run automatically on port 5000.

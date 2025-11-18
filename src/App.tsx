@@ -144,10 +144,21 @@ const App: React.FC = () => {
     //
 
     //
-    // CREDIT USAGE
+    // CREDIT USAGE — ADMIN HAVE INFINITE CREDITS
     //
     const handleCreditConsumption = (cost: number): boolean => {
-        if (!user || user.credits < cost) {
+        if (!user) {
+            setShowUpgradeModal(true);
+            return false;
+        }
+
+        // Admin hanno crediti infiniti
+        if (user.role === 'admin') {
+            return true;
+        }
+
+        // Utenti normali: controllo crediti
+        if (user.credits < cost) {
             setShowUpgradeModal(true);
             return false;
         }
@@ -278,7 +289,7 @@ const App: React.FC = () => {
                             );
                         case View.AdminPanel:
                             return user.role === "admin"
-                                ? <AdminPanel users={[]} />
+                                ? <AdminPanel user={user} />
                                 : <Dashboard payslip={selectedPayslip} alert={alert} payslips={payslips} handleCreditConsumption={handleCreditConsumption} />;
                         case View.ShiftPlanner:
                             return <ShiftPlanner shifts={shifts} onSave={() => {}} onDelete={() => {}} absences={absences} onSaveAbsence={() => {}} onDeleteAbsence={() => {}} />;

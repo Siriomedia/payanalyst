@@ -85,6 +85,17 @@ const Subscription: React.FC<SubscriptionProps> = ({ user, onPlanChange, onAddCr
                 <p className="text-lg text-gray-500 max-w-2xl mx-auto">
                     Acquista pacchetti di crediti che si aggiungono al tuo saldo attuale. Nessun abbonamento, nessun rinnovo automatico.
                 </p>
+                {user.role === 'admin' && (
+                    <div className="mt-6 max-w-2xl mx-auto bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-lg shadow-lg">
+                        <div className="flex items-center justify-center mb-2">
+                            <span className="text-3xl mr-3">🔐</span>
+                            <h3 className="text-xl font-bold">Account Amministratore</h3>
+                        </div>
+                        <p className="text-blue-100">
+                            Hai crediti <strong>ILLIMITATI</strong>. Tutte le funzionalità sono disponibili senza costi.
+                        </p>
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
@@ -129,8 +140,17 @@ const Subscription: React.FC<SubscriptionProps> = ({ user, onPlanChange, onAddCr
                             {packageKey === "free" ? (
                                 <div className="mt-auto py-4 px-6 text-center bg-gray-100 rounded-lg">
                                     <div className="text-sm text-gray-600 mb-1">Saldo attuale:</div>
-                                    <div className="text-3xl font-bold text-blue-600">{user.credits}</div>
-                                    <div className="text-sm text-gray-500">crediti</div>
+                                    <div className="text-3xl font-bold text-blue-600">
+                                        {user.role === 'admin' ? '∞' : user.credits}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                        {user.role === 'admin' ? 'crediti illimitati' : 'crediti'}
+                                    </div>
+                                    {user.role === 'admin' && (
+                                        <div className="mt-2 text-xs text-blue-600 font-semibold">
+                                            🔐 Account Admin
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div id={`paypal-button-${packageKey}`} className="mt-auto"></div>
