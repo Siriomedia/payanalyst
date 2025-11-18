@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import Upload from './components/Upload.tsx';
@@ -19,10 +19,11 @@ import { PLANS, CREDIT_COSTS } from './config/plans.ts';
 // FIREBASE
 import { auth, db } from "./firebase.ts";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
 const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<View>(View.Dashboard);
+    const isUpdatingFromFirestore = useRef(false);
 
     //
     // LOAD USER FROM LOCAL STORAGE
@@ -52,15 +53,16 @@ const App: React.FC = () => {
     });
 
     //
-    // FIREBASE AUTH LISTENER
+    // FIREBASE AUTH LISTENER + REAL-TIME USER DATA SYNC
     //
     useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async (fbUser) => {
+        const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
             if (!fbUser) {
                 setUser(null);
                 return;
             }
 
+            // Carica i dati iniziali
             const ref = doc(db, "users", fbUser.uid);
             const snap = await getDoc(ref);
 
@@ -84,8 +86,43 @@ const App: React.FC = () => {
             }
         });
 
-        return () => unsub();
+        return () => unsubAuth();
     }, []);
+
+    //
+    // REAL-TIME FIRESTORE LISTENER FOR USER DATA (crediti aggiornati da admin)
+    //
+    useEffect(() => {
+        if (!auth.currentUser) return;
+
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        const unsubFirestore = onSnapshot(userRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                
+                const updatedUser: User = {
+                    email: data.email,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    role: data.role,
+                    dateOfBirth: data.dateOfBirth,
+                    placeOfBirth: data.placeOfBirth,
+                    plan: data.plan,
+                    credits: data.credits ?? 0,
+                    creditResetDate: "",
+                };
+
+                // Imposta il flag per evitare loop infinito
+                isUpdatingFromFirestore.current = true;
+                setUser(updatedUser);
+                window.localStorage.setItem("gioia_user", JSON.stringify(updatedUser));
+            }
+        }, (error) => {
+            console.error('Errore nel listener Firestore utente:', error);
+        });
+
+        return () => unsubFirestore();
+    }, [auth.currentUser?.uid]);
 
     //
     // SAVE USER (LOCALSTORAGE + FIRESTORE)
@@ -97,6 +134,12 @@ const App: React.FC = () => {
         }
 
         window.localStorage.setItem("gioia_user", JSON.stringify(user));
+
+        // Se l'aggiornamento viene dal listener Firestore, non salvare di nuovo
+        if (isUpdatingFromFirestore.current) {
+            isUpdatingFromFirestore.current = false;
+            return;
+        }
 
         const saveToFirestore = async () => {
             if (!auth.currentUser) return;

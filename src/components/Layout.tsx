@@ -37,13 +37,35 @@ const Layout: React.FC<LayoutProps> = ({ children, user, currentView, setCurrent
                     >
                         <MenuIcon />
                     </button>
-                    <div className="flex items-center">
-                        <span className="text-gray-600 font-semibold">{user ? `${user.firstName} ${user.lastName}` : 'Utente'}</span>
-                        <img
-                            className="h-10 w-10 rounded-full object-cover ml-4"
-                            src={user ? `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=0D8ABC&color=fff` : `https://ui-avatars.com/api/?name=?&background=0D8ABC&color=fff`}
-                            alt="User avatar"
-                        />
+                    <div className="flex items-center space-x-4">
+                        {user && (
+                            <div 
+                                className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-purple-50 px-4 py-2 rounded-lg border border-blue-200 cursor-pointer hover:shadow-md transition-shadow"
+                                onClick={() => setCurrentView(View.Subscription)}
+                                title="Clicca per gestire crediti e abbonamenti"
+                            >
+                                <span className="text-2xl">💎</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500 font-medium">Crediti</div>
+                                    <div className="text-lg font-bold text-blue-600">
+                                        {user.role === 'admin' ? '∞' : user.credits}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex items-center space-x-3">
+                            <div className="text-right hidden sm:block">
+                                <div className="text-sm font-semibold text-gray-700">{user ? `${user.firstName} ${user.lastName}` : 'Utente'}</div>
+                                {user && user.role === 'admin' && (
+                                    <div className="text-xs text-blue-600 font-semibold">🔐 Amministratore</div>
+                                )}
+                            </div>
+                            <img
+                                className="h-10 w-10 rounded-full object-cover ring-2 ring-blue-200"
+                                src={user ? `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=0D8ABC&color=fff` : `https://ui-avatars.com/api/?name=?&background=0D8ABC&color=fff`}
+                                alt="User avatar"
+                            />
+                        </div>
                     </div>
                 </header>
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-8">
