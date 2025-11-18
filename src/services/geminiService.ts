@@ -492,12 +492,12 @@ const payslipSchema = {
                 firstName: { type: Type.STRING, description: "Nome del dipendente." },
                 lastName: { type: Type.STRING, description: "Cognome del dipendente." },
                 taxId: { type: Type.STRING, description: "Codice Fiscale del dipendente." },
-                dateOfBirth: { type: Type.STRING, description: "Data di nascita del dipendente (formato: GG/MM/AAAA o simile)." },
-                placeOfBirth: { type: Type.STRING, description: "Luogo di nascita del dipendente (città o comune)." },
+                dateOfBirth: { type: Type.STRING, description: "Data di nascita del dipendente (formato: GG/MM/AAAA o simile). OBBLIGATORIO: estrai sempre questo campo dalla sezione Dati Anagrafici della busta paga." },
+                placeOfBirth: { type: Type.STRING, description: "Luogo di nascita del dipendente (città o comune). OBBLIGATORIO: estrai sempre questo campo dalla sezione Dati Anagrafici della busta paga." },
                 level: { type: Type.STRING, description: "Livello contrattuale del dipendente." },
                 contractType: { type: Type.STRING, description: "Tipo di contratto (es. 'Commercio', 'Metalmeccanico')." },
             },
-            required: ['firstName', 'lastName', 'taxId']
+            required: ['firstName', 'lastName', 'taxId', 'dateOfBirth', 'placeOfBirth']
         },
         remunerationElements: { 
             type: Type.ARRAY, 
@@ -565,12 +565,12 @@ const payslipSchema = {
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
     const prompt = `Esegui un'analisi estremamente analitica e approfondita di questa busta paga italiana. Non tralasciare alcun dettaglio. Interpreta ogni singola voce, numero e codice, anche se posizionata in modo non standard. Popola lo schema JSON fornito con la massima precisione e granularità.
-- **Dati Anagrafici e Contrattuali**: Estrai tutti i dati relativi all'azienda e al dipendente. Per il dipendente, estrai Nome, Cognome, Codice Fiscale, Data di Nascita, Luogo di Nascita, livello, CCNL, qualifica, etc. IMPORTANTE: cerca attentamente data e luogo di nascita del dipendente nel documento.
+- **Dati Anagrafici e Contrattuali - OBBLIGATORI**: Devi SEMPRE estrarre Nome, Cognome, Codice Fiscale, Data di Nascita e Luogo di Nascita del dipendente. Questi dati si trovano nella sezione "Dati Anagrafici" o "Dati Dipendente" della busta paga. Cerca attentamente nel documento: la Data di Nascita è spesso in formato GG/MM/AAAA e il Luogo di Nascita è il nome del comune. NON usare stringhe vuote per questi campi - se non li trovi, indica chiaramente "NON TROVATO" ma cerca sempre con attenzione. Estrai anche livello, CCNL, qualifica e dati aziendali.
 - **Elementi della Retribuzione**: Identifica la sezione 'Elementi della Retribuzione' (o simile) e popola l'array \`remunerationElements\` con ogni singola voce che contribuisce alla retribuzione mensile lorda (es. Paga Base, Contingenza, Scatti Anzianità, Superminimo, E.D.R.). È fondamentale che questa sezione sia completa.
 - **Corpo della Busta Paga**: Popola \`incomeItems\` con TUTTE le competenze a favore del dipendente (incluse quelle di base già elencate in \`remunerationElements\`) e \`deductionItems\` con tutte le trattenute.
 - **Dati Fiscali, Previdenziali, TFR**: Dettaglia con precisione tutte le sezioni relative a IRPEF, contributi INPS, Trattamento di Fine Rapporto, e lo stato di ferie e permessi.
 - **Accuratezza Numerica**: Assicurati che tutti i campi numerici siano correttamente parsati come numeri. Non inserire il simbolo dell'euro o altri caratteri non numerici.
-- **Completezza**: Se un dato non è esplicitamente presente, usa 0 per i valori numerici e stringhe vuote per il testo. Non lasciare campi vuoti se sono richiesti.
+- **Completezza per campi opzionali**: Solo per campi NON obbligatori, se un dato non è esplicitamente presente, usa 0 per i valori numerici e stringhe vuote per il testo.
 - **ID Univoco**: Genera un UUID per il campo 'id'.`;
 
     const response = await ai.models.generateContent({
@@ -594,8 +594,42 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
         }
         
+        // Validazione dati anagrafici obbligatori
+        if (!payslipData.employee) {
+            throw new Error("ERRORE: Gemini non ha estratto i dati del dipendente dalla busta paga.");
+        }
+        
+        const missingFields = [];
+        if (!payslipData.employee.firstName || payslipData.employee.firstName.trim() === "") {
+            missingFields.push("Nome");
+        }
+        if (!payslipData.employee.lastName || payslipData.employee.lastName.trim() === "") {
+            missingFields.push("Cognome");
+        }
+        if (!payslipData.employee.dateOfBirth || payslipData.employee.dateOfBirth.trim() === "") {
+            missingFields.push("Data di Nascita");
+        }
+        if (!payslipData.employee.placeOfBirth || payslipData.employee.placeOfBirth.trim() === "") {
+            missingFields.push("Luogo di Nascita");
+        }
+        
+        if (missingFields.length > 0) {
+            throw new Error(
+                `⚠️ DATI ANAGRAFICI MANCANTI NELLA BUSTA PAGA\n\n` +
+                `Non è stato possibile estrarre i seguenti dati dalla busta paga:\n` +
+                `${missingFields.map(f => `• ${f}`).join('\n')}\n\n` +
+                `Verifica che la busta paga contenga chiaramente tutti i dati anagrafici del dipendente ` +
+                `(Nome, Cognome, Data di Nascita, Luogo di Nascita) e riprova con un'immagine più nitida.`
+            );
+        }
+        
         return payslipData as Payslip;
     } catch (e) {
+        // Se è il nostro errore di validazione, rilancialo
+        if (e instanceof Error && (e.message.includes("DATI ANAGRAFICI") || e.message.includes("ERRORE:"))) {
+            throw e;
+        }
+        // Altrimenti è un errore di parsing
         console.error("Failed to parse Gemini response as JSON:", jsonStr, e);
         throw new Error("L'analisi ha prodotto un risultato non valido. Assicurati che il file sia una busta paga chiara.");
     }
