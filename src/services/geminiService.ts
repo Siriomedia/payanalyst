@@ -730,49 +730,119 @@ export const getChatResponse = async (
 const historicalAnalysisSchema = {
     type: Type.OBJECT,
     properties: {
-        summary: { type: Type.STRING, description: "Un'analisi testuale riassuntiva e professionale delle principali differenze e possibili cause." },
-        averageNetSalary: { type: Type.NUMBER, description: "La media degli stipendi netti dei mesi precedenti." },
-        averageGrossSalary: { type: Type.NUMBER, description: "La media degli stipendi lordi dei mesi precedenti." },
-        differingItems: {
+        summary: { type: Type.STRING, description: "Una breve sintesi (2-3 frasi) delle variazioni principali osservate nello storico." },
+        monthlyData: {
             type: Type.ARRAY,
-            description: "Un elenco delle voci di costo che presentano le differenze più significative.",
+            description: "Dati riassuntivi per ogni mese, ordinati cronologicamente dal più vecchio al più recente.",
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    description: { type: Type.STRING, description: "La descrizione della voce (es. 'Straordinari', 'Contributi IVS')." },
-                    currentValue: { type: Type.NUMBER, description: "Il valore della voce nella busta paga corrente." },
-                    averageValue: { type: Type.NUMBER, description: "Il valore medio della voce nelle buste paga precedenti. Se la voce è nuova, questo valore è 0." },
-                    difference: { type: Type.NUMBER, description: "La differenza tra il valore corrente e la media." },
-                    type: { type: Type.STRING, description: "Il tipo di voce: 'income' (competenza), 'deduction' (trattenuta), o 'other' (es. TFR, ferie)." },
-                    comment: { type: Type.STRING, description: "Un breve commento dell'IA sulla possibile causa o significato di questa differenza." }
+                    month: { type: Type.NUMBER, description: "Mese (1-12)" },
+                    year: { type: Type.NUMBER, description: "Anno (es. 2024)" },
+                    netSalary: { type: Type.NUMBER, description: "Stipendio netto del mese" },
+                    grossSalary: { type: Type.NUMBER, description: "Stipendio lordo del mese" },
+                    totalDeductions: { type: Type.NUMBER, description: "Totale trattenute del mese" },
+                    items: {
+                        type: Type.ARRAY,
+                        description: "Voci significative del mese (straordinari, bonus, contributi, etc.)",
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                description: { type: Type.STRING, description: "Nome della voce" },
+                                value: { type: Type.NUMBER, description: "Valore della voce" },
+                                type: { type: Type.STRING, description: "'income', 'deduction', o 'other'" }
+                            },
+                            required: ['description', 'value', 'type']
+                        }
+                    }
                 },
-                required: ['description', 'currentValue', 'averageValue', 'difference', 'type', 'comment']
+                required: ['month', 'year', 'netSalary', 'grossSalary', 'totalDeductions', 'items']
+            }
+        },
+        comparisons: {
+            type: Type.ARRAY,
+            description: "Tabella comparativa delle voci principali mese per mese con differenze.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    description: { type: Type.STRING, description: "Nome della voce (es. 'Stipendio Netto', 'Straordinari', 'Contributi INPS')" },
+                    type: { type: Type.STRING, description: "'income', 'deduction', 'other', o 'summary' per le voci riassuntive" },
+                    values: {
+                        type: Type.ARRAY,
+                        description: "Valori per ogni mese in ordine cronologico",
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                month: { type: Type.NUMBER, description: "Mese" },
+                                year: { type: Type.NUMBER, description: "Anno" },
+                                value: { type: Type.NUMBER, description: "Valore della voce nel mese" },
+                                differenceFromPrevious: { type: Type.NUMBER, nullable: true, description: "Differenza rispetto al mese precedente (null per il primo mese)" }
+                            },
+                            required: ['month', 'year', 'value', 'differenceFromPrevious']
+                        }
+                    }
+                },
+                required: ['description', 'type', 'values']
+            }
+        },
+        insights: {
+            type: Type.ARRAY,
+            description: "Osservazioni chiave sulle variazioni più significative.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    category: { type: Type.STRING, description: "Categoria dell'osservazione (es. 'Straordinari', 'Tasse', 'Contributi')" },
+                    observation: { type: Type.STRING, description: "Breve osservazione sulla variazione" }
+                },
+                required: ['category', 'observation']
             }
         }
     },
-    required: ['summary', 'averageNetSalary', 'averageGrossSalary', 'differingItems']
+    required: ['summary', 'monthlyData', 'comparisons', 'insights']
 };
 
 
 export const getHistoricalAnalysis = async (currentPayslip: Payslip, historicalPayslips: Payslip[]): Promise<HistoricalAnalysisResult> => {
-     if (historicalPayslips.length === 0) {
+    if (historicalPayslips.length === 0) {
         throw new Error("Nessuna busta paga storica fornita per l'analisi.");
     }
     
-    const prompt = `In qualità di esperto consulente del lavoro, analizza la busta paga corrente in relazione allo storico delle buste paga precedenti. L'obiettivo è identificare e spiegare le variazioni significative.
+    const allPayslips = [...historicalPayslips, currentPayslip].sort((a, b) => {
+        if (a.period.year !== b.period.year) return a.period.year - b.period.year;
+        return a.period.month - b.period.month;
+    });
+    
+    const prompt = `In qualità di esperto consulente del lavoro, crea un'analisi comparativa MESE PER MESE delle buste paga fornite. L'obiettivo è mostrare l'evoluzione nel tempo di ogni voce.
 
-**Busta Paga Corrente (${currentPayslip.period.month}/${currentPayslip.period.year}):**
-${JSON.stringify(currentPayslip, null, 2)}
-
-**Storico Buste Paga Precedenti:**
-${JSON.stringify(historicalPayslips, null, 2)}
+**Buste Paga (in ordine cronologico):**
+${JSON.stringify(allPayslips, null, 2)}
 
 **Istruzioni:**
-1.  **Calcola le medie:** Calcola la media dello stipendio lordo e netto dei mesi precedenti.
-2.  **Identifica le differenze:** Confronta ogni voce (competenze, trattenute, TFR, ferie, etc.) della busta paga corrente con la media delle stesse voci nello storico. Se una voce è presente solo nel mese corrente, considerala una nuova voce.
-3.  **Fornisci un'analisi:** Scrivi un riassunto chiaro e conciso in italiano che spieghi le principali differenze. Ad esempio, se lo stipendio netto è più alto, spiega perché (es. bonus, meno tasse, etc.).
-4.  **Elenca le voci significative:** Popola l'array 'differingItems' solo con le voci che hanno una variazione rilevante (es. una differenza di più di qualche euro, o voci completamente nuove/mancanti). Per ogni voce, fornisci un breve commento che ne spieghi la natura.
-5.  **Rispetta lo schema:** Restituisci i risultati esclusivamente nel formato JSON specificato, senza testo aggiuntivo.`;
+1. **Ordina cronologicamente:** I dati devono essere ordinati dal mese più vecchio al più recente.
+
+2. **monthlyData:** Per ogni mese, estrai:
+   - Stipendio netto e lordo
+   - Totale trattenute
+   - Voci significative (straordinari, bonus, indennità, contributi importanti)
+
+3. **comparisons:** Crea una tabella comparativa con queste voci OBBLIGATORIE:
+   - "Stipendio Netto" (type: summary)
+   - "Stipendio Lordo" (type: summary)
+   - "Totale Trattenute" (type: summary)
+   - Altre voci rilevanti che variano tra i mesi (straordinari, bonus, contributi INPS, IRPEF, etc.)
+   
+   Per ogni voce, includi il valore di OGNI mese e calcola la differenza rispetto al mese precedente.
+   La differenza del primo mese è null.
+
+4. **insights:** Fornisci 3-5 osservazioni brevi sulle variazioni più significative (es. "Straordinari aumentati del 50% a Marzo", "IRPEF stabile nei 6 mesi").
+
+5. **summary:** Una sintesi di 2-3 frasi sull'andamento generale.
+
+**IMPORTANTE:** 
+- Ogni voce in "comparisons" DEVE avere un valore per OGNI mese presente nei dati.
+- Se una voce non è presente in un mese, usa 0 come valore.
+- Calcola sempre differenceFromPrevious come (valore_corrente - valore_precedente).
+- Rispetta rigorosamente lo schema JSON.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
