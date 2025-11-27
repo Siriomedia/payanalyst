@@ -16,7 +16,7 @@ GioIA is an Italian payslip analysis tool that uses Google's Gemini AI to analyz
 
 ## Key Features
 - Payslip upload and AI-powered analysis
-- Historical salary analysis with charts
+- **Historical salary analysis with month-by-month comparison tables**
 - Shift planning and tracking
 - Leave planner
 - **Credit recharge system** with PayPal integration
@@ -117,6 +117,19 @@ Without this, you'll see an `auth/unauthorized-domain` error when attempting to 
 ```
 
 ## Recent Changes
+
+### Nov 27, 2025 - Historical Analysis Refactoring
+- **Completely redesigned historical analysis feature**:
+  - Changed from summary-based to month-by-month tabular comparison
+  - New comparison table with months as columns and voices as rows
+  - Color-coded rows: blue (summary), green (income), red (deductions)
+  - Differences from previous month shown in parentheses (+€ green, -€ red)
+  - Sticky left column for row descriptions on horizontal scroll
+  - AI-generated insights section with category and observations
+  - PDF export in landscape orientation for better table display
+  - Updated Gemini prompt and schema for structured tabular data
+  - New TypeScript types: MonthlyData, MonthlyComparison
+  - Responsive design with horizontal scrolling on mobile
 
 ### Nov 19, 2025 - Admin Panel Synchronization & Build Fixes
 - **Fixed admin panel user synchronization**:
