@@ -1,0 +1,42 @@
+Esatto, l'output che hai incollato conferma pienamente che il modello sta interpretando la richiesta in modo troppo letterale.
+
+Vede il campo "Quota Maturata" (che nel codice si aspetta sia la quota del mese) e, trovando sulla busta paga la dicitura "Quota anno" (880,82 €), decide che non corrispondono e mette 0.00.
+
+Per risolvere definitivamente questo problema e far apparire gli 880,82 €, devi modificare il file geminiService.ts in due punti specifici (Schema e Prompt), rendendo le istruzioni meno rigide.
+
+Ecco le modifiche da copiare e incollare:
+
+1. Modifica lo Schema (payslipSchema)
+Cerca la definizione dell'oggetto tfr e sostituisci la riga accrued con questa descrizione più "aperta":
+
+TypeScript
+
+// In geminiService.ts, dentro payslipSchema -> properties -> tfr -> properties
+
+tfr: {
+    type: Type.OBJECT,
+    properties: {
+        taxableBase: { type: Type.NUMBER, description: "Imponibile TFR del mese." },
+        // MODIFICA QUESTA RIGA:
+        accrued: { type: Type.NUMBER, description: "Quota TFR maturata. ATTENZIONE: Se nel documento trovi 'Quota anno', 'Accantonamento anno' o simili, inserisci quel valore qui. Non lasciare a 0 se esiste un importo progressivo." },
+        previousBalance: { type: Type.NUMBER, description: "Fondo TFR al 31/12 dell'anno precedente o al periodo precedente." },
+        totalFund: { type: Type.NUMBER, description: "Fondo TFR totale e aggiornato." },
+    },
+    required: ['taxableBase', 'accrued', 'previousBalance', 'totalFund']
+},
+2. Modifica il Prompt (analyzePayslip)
+Rafforza l'istruzione nel prompt testuale per guidare l'AI esattamente dove guardare. Sostituisci la variabile prompt con questa versione che include un punto specifico sul TFR:
+
+TypeScript
+
+// In geminiService.ts, dentro la funzione analyzePayslip
+
+const prompt = `Esegui un'analisi estremamente analitica e approfondita di questa busta paga italiana.
+- **Dati Anagrafici e Contrattuali**: Estrai tutti i dati relativi all'azienda e al dipendente.
+- **Elementi della Retribuzione**: Popola l'array \`remunerationElements\` con le voci fisse (Paga Base, Scatti, ecc.).
+- **Corpo della Busta Paga**: Popola \`incomeItems\` e \`deductionItems\` con tutte le voci.
+- **TFR (IMPORTANTE)**: Per la sezione TFR, estrai il valore della "Quota maturata". Se la busta paga riporta solo la "Quota anno" (o progressivo annuo), utilizza quel valore per il campo \`accrued\`. Non inserire 0 se è presente un valore positivo nella colonna della quota/accantonamento TFR.
+- **Dati Fiscali e Previdenziali**: Dettaglia le sezioni IRPEF e INPS.
+- **Accuratezza Numerica**: Usa solo numeri, niente simboli di valuta. Usa 0 solo se il dato è totalmente assente.
+- **ID Univoco**: Genera un UUID.`;
+Applicando queste due modifiche, al prossimo caricamento del file, il sistema leggerà correttamente 880.82 (o il valore presente) invece di 0.00.

@@ -543,7 +543,7 @@ const payslipSchema = {
             type: Type.OBJECT,
             properties: {
                 taxableBase: { type: Type.NUMBER, description: "Imponibile TFR del mese." },
-                accrued: { type: Type.NUMBER, description: "Quota TFR maturata nel mese." },
+                accrued: { type: Type.NUMBER, description: "Quota TFR maturata. ATTENZIONE: Se nel documento trovi 'Quota anno', 'Accantonamento anno' o simili, inserisci quel valore qui. Non lasciare a 0 se esiste un importo progressivo." },
                 previousBalance: { type: Type.NUMBER, description: "Fondo TFR al 31/12 dell'anno precedente o al periodo precedente." },
                 totalFund: { type: Type.NUMBER, description: "Fondo TFR totale e aggiornato." },
             },
@@ -568,8 +568,9 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
 - **Dati Anagrafici e Contrattuali - OBBLIGATORI**: Devi SEMPRE estrarre Nome, Cognome, Codice Fiscale, Data di Nascita e Luogo di Nascita del dipendente. Questi dati si trovano nella sezione "Dati Anagrafici" o "Dati Dipendente" della busta paga. Cerca attentamente nel documento: la Data di Nascita è spesso in formato GG/MM/AAAA e il Luogo di Nascita è il nome del comune. NON usare stringhe vuote per questi campi - se non li trovi, indica chiaramente "NON TROVATO" ma cerca sempre con attenzione. Estrai anche livello, CCNL, qualifica e dati aziendali.
 - **Elementi della Retribuzione**: Identifica la sezione 'Elementi della Retribuzione' (o simile) e popola l'array \`remunerationElements\` con ogni singola voce che contribuisce alla retribuzione mensile lorda (es. Paga Base, Contingenza, Scatti Anzianità, Superminimo, E.D.R.). È fondamentale che questa sezione sia completa.
 - **Corpo della Busta Paga**: Popola \`incomeItems\` con TUTTE le competenze a favore del dipendente (incluse quelle di base già elencate in \`remunerationElements\`) e \`deductionItems\` con tutte le trattenute.
-- **Dati Fiscali, Previdenziali, TFR**: Dettaglia con precisione tutte le sezioni relative a IRPEF, contributi INPS, Trattamento di Fine Rapporto, e lo stato di ferie e permessi.
-- **Accuratezza Numerica**: Assicurati che tutti i campi numerici siano correttamente parsati come numeri. Non inserire il simbolo dell'euro o altri caratteri non numerici.
+- **TFR (IMPORTANTE)**: Per la sezione TFR, estrai il valore della "Quota maturata". Se la busta paga riporta solo la "Quota anno" (o progressivo annuo), utilizza quel valore per il campo \`accrued\`. Non inserire 0 se è presente un valore positivo nella colonna della quota/accantonamento TFR.
+- **Dati Fiscali e Previdenziali**: Dettaglia con precisione tutte le sezioni relative a IRPEF, contributi INPS, e lo stato di ferie e permessi.
+- **Accuratezza Numerica**: Assicurati che tutti i campi numerici siano correttamente parsati come numeri. Non inserire il simbolo dell'euro o altri caratteri non numerici. Usa 0 solo se il dato è totalmente assente.
 - **Completezza per campi opzionali**: Solo per campi NON obbligatori, se un dato non è esplicitamente presente, usa 0 per i valori numerici e stringhe vuote per il testo.
 - **ID Univoco**: Genera un UUID per il campo 'id'.`;
 

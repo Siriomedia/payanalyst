@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gioia-cache-v33';
+const CACHE_NAME = 'gioia-cache-v34';
 const urlsToCache = [
   '/',
   '/index.html',

@@ -538,15 +538,15 @@ const payslipSchema = {
             required: ['taxableBase', 'employeeContribution', 'companyContribution']
         },
         tfr: {
-            type: Type.OBJECT,
-            properties: {
-                taxableBase: { type: Type.NUMBER, description: "Imponibile TFR del mese." },
-                accrued: { type: Type.NUMBER, description: "Quota TFR maturata nel mese." },
-                previousBalance: { type: Type.NUMBER, description: "Fondo TFR al 31/12 dell'anno precedente o al periodo precedente." },
-                totalFund: { type: Type.NUMBER, description: "Fondo TFR totale e aggiornato." },
-            },
-            required: ['taxableBase', 'accrued', 'previousBalance', 'totalFund']
-        },
+    type: Type.OBJECT,
+    properties: {
+        taxableBase: { type: Type.NUMBER, description: "Imponibile TFR del mese." },
+        accrued: { type: Type.NUMBER, description: "Quota TFR maturata/accantonata. Cerca valori etichettati come 'Quota Anno', 'Quota Maturata', 'Accantonamento' o 'Importo'. Se presente solo il progressivo annuo, inserisci quello." },
+        previousBalance: { type: Type.NUMBER, description: "Fondo TFR al 31/12 dell'anno precedente o al periodo precedente." },
+        totalFund: { type: Type.NUMBER, description: "Fondo TFR totale e aggiornato (spesso somma di fondo precedente + quota anno - rivalutazioni)." },
+    },
+    required: ['taxableBase', 'accrued', 'previousBalance', 'totalFund']
+},
         leaveData: {
             type: Type.OBJECT,
             properties: {
