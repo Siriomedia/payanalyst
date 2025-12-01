@@ -92,14 +92,15 @@ export interface Payslip {
 
     tfr: { // Trattamento di Fine Rapporto
         taxableBase: number; // Imponibile TFR
-        accrued: number; // Quota maturata nel mese
+        accrued: number; // Quota maturata (progressivo annuale)
         previousBalance: number; // Fondo al 31/12 anno precedente
         totalFund: number; // Fondo TFR totale
     };
 
     leaveData: {
-        vacation: LeaveBalance; // Ferie
-        permits: LeaveBalance; // Permessi (ROL)
+        vacation: LeaveBalance; // Ferie (in ORE)
+        permits: LeaveBalance; // Permessi/ROL (in ORE)
+        exHolidayPermits?: LeaveBalance; // Permessi Ex Festività (in ORE)
     };
 }
 

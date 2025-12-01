@@ -22,11 +22,11 @@ interface DashboardProps {
     handleCreditConsumption: (cost: number) => boolean;
 }
 
-const DetailRow: React.FC<{ label: string, value: string | number | undefined, currency?: boolean }> = ({ label, value, currency = false }) => (
+const DetailRow: React.FC<{ label: string, value: string | number | undefined, currency?: boolean, unit?: string }> = ({ label, value, currency = false, unit }) => (
     <div className="flex justify-between items-center py-1.5 sm:py-2 border-b border-gray-100 last:border-b-0 gap-2">
         <span className="text-xs sm:text-sm text-gray-600 flex-shrink">{label}</span>
         <span className="text-xs sm:text-sm font-semibold text-gray-800 whitespace-nowrap">
-            {currency ? `€ ${Number(value || 0).toFixed(2)}` : value || 'N/A'}
+            {currency ? `€ ${Number(value || 0).toFixed(2)}` : unit ? `${Number(value || 0).toFixed(1)} ${unit}` : value || 'N/A'}
         </span>
     </div>
 );
@@ -335,18 +335,27 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
                             <div className="space-y-4">
                                 <div>
                                     <h3 className="font-semibold text-gray-700">Ferie</h3>
-                                    <DetailRow label="Saldo Precedente" value={payslip.leaveData.vacation.previous} />
-                                    <DetailRow label="Maturate" value={payslip.leaveData.vacation.accrued} />
-                                    <DetailRow label="Godute" value={payslip.leaveData.vacation.taken} />
-                                    <DetailRow label="Saldo Residuo" value={payslip.leaveData.vacation.balance} />
+                                    <DetailRow label="Saldo Precedente" value={payslip.leaveData.vacation.previous} unit="ore" />
+                                    <DetailRow label="Maturate (da inizio anno)" value={payslip.leaveData.vacation.accrued} unit="ore" />
+                                    <DetailRow label="Godute (da inizio anno)" value={payslip.leaveData.vacation.taken} unit="ore" />
+                                    <DetailRow label="Saldo Residuo" value={payslip.leaveData.vacation.balance} unit="ore" />
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-700">Permessi (ROL)</h3>
-                                    <DetailRow label="Saldo Precedente" value={payslip.leaveData.permits.previous} />
-                                    <DetailRow label="Maturati" value={payslip.leaveData.permits.accrued} />
-                                    <DetailRow label="Goduti" value={payslip.leaveData.permits.taken} />
-                                    <DetailRow label="Saldo Residuo" value={payslip.leaveData.permits.balance} />
+                                    <DetailRow label="Saldo Precedente" value={payslip.leaveData.permits.previous} unit="ore" />
+                                    <DetailRow label="Maturati (da inizio anno)" value={payslip.leaveData.permits.accrued} unit="ore" />
+                                    <DetailRow label="Goduti (da inizio anno)" value={payslip.leaveData.permits.taken} unit="ore" />
+                                    <DetailRow label="Saldo Residuo" value={payslip.leaveData.permits.balance} unit="ore" />
                                 </div>
+                                {payslip.leaveData.exHolidayPermits && (
+                                    <div>
+                                        <h3 className="font-semibold text-gray-700">Permessi Ex Festività</h3>
+                                        <DetailRow label="Saldo Precedente" value={payslip.leaveData.exHolidayPermits.previous} unit="ore" />
+                                        <DetailRow label="Maturati (da inizio anno)" value={payslip.leaveData.exHolidayPermits.accrued} unit="ore" />
+                                        <DetailRow label="Goduti (da inizio anno)" value={payslip.leaveData.exHolidayPermits.taken} unit="ore" />
+                                        <DetailRow label="Saldo Residuo" value={payslip.leaveData.exHolidayPermits.balance} unit="ore" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

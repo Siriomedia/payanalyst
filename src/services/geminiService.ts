@@ -457,10 +457,10 @@ const payItemSchema = {
 const leaveBalanceSchema = {
     type: Type.OBJECT,
     properties: {
-        previous: { type: Type.NUMBER, description: "Saldo anno/periodo precedente." },
-        accrued: { type: Type.NUMBER, description: "Maturato nel periodo." },
-        taken: { type: Type.NUMBER, description: "Goduto nel periodo." },
-        balance: { type: Type.NUMBER, description: "Saldo residuo." }
+        previous: { type: Type.NUMBER, description: "Saldo anno/periodo precedente (in ORE, non giorni)." },
+        accrued: { type: Type.NUMBER, description: "Maturato da inizio anno (progressivo annuale in ORE). ATTENZIONE: questo è il totale maturato dall'inizio dell'anno, NON solo il mese corrente." },
+        taken: { type: Type.NUMBER, description: "Goduto/usato da inizio anno (in ORE)." },
+        balance: { type: Type.NUMBER, description: "Saldo residuo totale (in ORE)." }
     },
     required: ['previous', 'accrued', 'taken', 'balance']
 };
@@ -552,8 +552,9 @@ const payslipSchema = {
         leaveData: {
             type: Type.OBJECT,
             properties: {
-                vacation: { ...leaveBalanceSchema, description: "Dettaglio Ferie." },
-                permits: { ...leaveBalanceSchema, description: "Dettaglio Permessi/ROL." },
+                vacation: { ...leaveBalanceSchema, description: "Dettaglio Ferie (tutti i valori in ORE, non giorni)." },
+                permits: { ...leaveBalanceSchema, description: "Dettaglio Permessi/ROL (tutti i valori in ORE, non giorni)." },
+                exHolidayPermits: { ...leaveBalanceSchema, description: "Dettaglio Permessi Ex Festività (tutti i valori in ORE, non giorni). Cerca 'Ex Fest', 'Ex Festività', 'Festività Abolite' o simili." },
             },
             required: ['vacation', 'permits']
         },
@@ -569,7 +570,8 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
 - **Elementi della Retribuzione**: Identifica la sezione 'Elementi della Retribuzione' (o simile) e popola l'array \`remunerationElements\` con ogni singola voce che contribuisce alla retribuzione mensile lorda (es. Paga Base, Contingenza, Scatti Anzianità, Superminimo, E.D.R.). È fondamentale che questa sezione sia completa.
 - **Corpo della Busta Paga**: Popola \`incomeItems\` con TUTTE le competenze a favore del dipendente (incluse quelle di base già elencate in \`remunerationElements\`) e \`deductionItems\` con tutte le trattenute.
 - **TFR (IMPORTANTE)**: Per la sezione TFR, estrai il valore della "Quota maturata". Se la busta paga riporta solo la "Quota anno" (o progressivo annuo), utilizza quel valore per il campo \`accrued\`. Non inserire 0 se è presente un valore positivo nella colonna della quota/accantonamento TFR.
-- **Dati Fiscali e Previdenziali**: Dettaglia con precisione tutte le sezioni relative a IRPEF, contributi INPS, e lo stato di ferie e permessi.
+- **FERIE, PERMESSI E EX FESTIVITÀ (IMPORTANTE)**: I valori di ferie, permessi (ROL) e permessi ex festività sono espressi in ORE, non in giorni. Il campo "maturato" (accrued) rappresenta il TOTALE maturato da inizio anno (progressivo annuale), NON il maturato del singolo mese. Estrai anche i "Permessi Ex Festività" (o "Ex Fest", "Festività Abolite") nel campo \`exHolidayPermits\`.
+- **Dati Fiscali e Previdenziali**: Dettaglia con precisione tutte le sezioni relative a IRPEF e contributi INPS.
 - **Accuratezza Numerica**: Assicurati che tutti i campi numerici siano correttamente parsati come numeri. Non inserire il simbolo dell'euro o altri caratteri non numerici. Usa 0 solo se il dato è totalmente assente.
 - **Completezza per campi opzionali**: Solo per campi NON obbligatori, se un dato non è esplicitamente presente, usa 0 per i valori numerici e stringhe vuote per il testo.
 - **ID Univoco**: Genera un UUID per il campo 'id'.`;
