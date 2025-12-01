@@ -466,6 +466,27 @@ const App: React.FC = () => {
     };
 
     //
+    // DELETE PAYSLIP FROM ARCHIVE
+    //
+    const handleDeletePayslip = (payslipId: string) => {
+        setPayslips(prev => {
+            const updated = prev.filter(p => p.id !== payslipId);
+            return updated;
+        });
+    };
+
+    //
+    // COMPARE PAYSLIPS - Navigate to Compare view
+    //
+    const handleComparePayslips = (payslipsToCompareArr: [Payslip, Payslip]) => {
+        if (!handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS)) {
+            return;
+        }
+        setPayslipsToCompare(payslipsToCompareArr);
+        setCurrentView(View.Compare);
+    };
+
+    //
     // LOGOUT
     //
     const handleLogout = async () => {
@@ -513,12 +534,12 @@ const App: React.FC = () => {
                             return (
                                 <Archive
                                     payslips={payslips}
-                                    onSelectPayslip={setSelectedPayslip}
-                                    onCompare={(p) =>
-                                        handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS) &&
-                                        setPayslipsToCompare(p)
-                                    }
-                                    onDeletePayslip={() => {}}
+                                    onSelectPayslip={(p) => {
+                                        setSelectedPayslip(p);
+                                        setCurrentView(View.Dashboard);
+                                    }}
+                                    onCompare={handleComparePayslips}
+                                    onDeletePayslip={handleDeletePayslip}
                                 />
                             );
                         case View.Compare:
