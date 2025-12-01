@@ -28,7 +28,13 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         if (selectedForCompare.length === 2) {
             const payslipsToCompare = payslips.filter(p => selectedForCompare.includes(p.id));
             if (payslipsToCompare.length === 2) {
-                onCompare([payslipsToCompare[0], payslipsToCompare[1]]);
+                // Ordina: più recente prima, meno recente dopo
+                const sorted = [...payslipsToCompare].sort((a, b) => {
+                    const dateA = new Date(a.period.year, a.period.month - 1);
+                    const dateB = new Date(b.period.year, b.period.month - 1);
+                    return dateB.getTime() - dateA.getTime(); // Decrescente
+                });
+                onCompare([sorted[0], sorted[1]]);
             }
         }
     };

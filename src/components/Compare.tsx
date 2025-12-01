@@ -48,25 +48,32 @@ const Compare: React.FC<CompareProps> = ({ payslips }) => {
     
     const [p1, p2] = payslips;
 
-    const ComparisonRow: React.FC<{ label: string, val1: number, val2: number, isCurrency?: boolean }> = ({ label, val1, val2, isCurrency = true }) => {
-        const diff = val2 - val1;
-        const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500';
+    const ComparisonRow: React.FC<{ label: string, val1: number, val2: number, isCurrency?: boolean, highlight?: boolean }> = ({ label, val1, val2, isCurrency = true, highlight = false }) => {
+        // val1 = più recente, val2 = precedente → diff = recente - precedente
+        const diff = val1 - val2;
+        const diffColor = diff > 0 ? 'text-green-600 bg-green-50' : diff < 0 ? 'text-red-600 bg-red-50' : 'text-gray-500';
         const diffSign = diff > 0 ? '+' : '';
         const formatValue = (val: number) => isCurrency ? `€ ${val.toFixed(2)}` : val.toFixed(2);
+        const rowBg = highlight ? 'bg-blue-50 font-bold' : 'hover:bg-gray-50';
 
         return (
-            <tr className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-                <td className="py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">{label}</td>
-                <td className="py-2 sm:py-3 px-2 sm:px-4 text-center font-mono text-xs sm:text-sm whitespace-nowrap">{formatValue(val1)}</td>
-                <td className="py-2 sm:py-3 px-2 sm:px-4 text-center font-mono text-xs sm:text-sm whitespace-nowrap">{formatValue(val2)}</td>
-                <td className={`py-2 sm:py-3 px-2 sm:px-4 text-center font-mono font-semibold text-xs sm:text-sm whitespace-nowrap ${diffColor}`}>{diffSign}{formatValue(diff)}</td>
+            <tr className={`border-b border-gray-200 last:border-b-0 ${rowBg}`}>
+                <td className="py-3 sm:py-4 px-3 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">{label}</td>
+                <td className="py-3 sm:py-4 px-3 sm:px-4 text-center font-mono text-sm sm:text-base whitespace-nowrap">{formatValue(val1)}</td>
+                <td className="py-3 sm:py-4 px-3 sm:px-4 text-center font-mono text-sm sm:text-base whitespace-nowrap">{formatValue(val2)}</td>
+                <td className={`py-3 sm:py-4 px-3 sm:px-4 text-center font-mono font-bold text-sm sm:text-base whitespace-nowrap rounded ${diffColor}`}>{diffSign}{formatValue(diff)}</td>
             </tr>
         )
     };
 
     return (
         <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Confronto Buste Paga</h1>
+            <div className="mb-4 sm:mb-6">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Confronto Buste Paga</h1>
+                <p className="text-sm text-gray-500 mt-1">
+                    {getMonthName(p1.period.month)} {p1.period.year} (più recente) vs {getMonthName(p2.period.month)} {p2.period.year} (precedente)
+                </p>
+            </div>
             
             {/* AI Analysis Section */}
             <div className="mb-6 sm:mb-8 bg-white p-4 sm:p-6 rounded-xl shadow-md">
@@ -106,9 +113,9 @@ const Compare: React.FC<CompareProps> = ({ payslips }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            <tr className="bg-blue-50"><td colSpan={4} className="py-1.5 sm:py-2 px-2 sm:px-4 font-bold text-blue-800 text-xs sm:text-sm">Riepilogo</td></tr>
-                        <ComparisonRow label="Stipendio Lordo" val1={p1.grossSalary} val2={p2.grossSalary} />
-                        <ComparisonRow label="Stipendio Netto" val1={p1.netSalary} val2={p2.netSalary} />
+                            <tr className="bg-blue-100"><td colSpan={4} className="py-2 sm:py-3 px-3 sm:px-4 font-bold text-blue-800 text-sm sm:text-base">Riepilogo Principale</td></tr>
+                        <ComparisonRow label="Stipendio Lordo" val1={p1.grossSalary} val2={p2.grossSalary} highlight={true} />
+                        <ComparisonRow label="Stipendio Netto" val1={p1.netSalary} val2={p2.netSalary} highlight={true} />
                         <ComparisonRow label="Trattenute Totali" val1={p1.totalDeductions} val2={p2.totalDeductions} />
                         
                             <tr className="bg-gray-50"><td colSpan={4} className="py-1.5 sm:py-2 px-2 sm:px-4 font-bold text-gray-500 text-xs sm:text-sm">Dettaglio Fiscale</td></tr>

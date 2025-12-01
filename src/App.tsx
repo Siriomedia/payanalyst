@@ -498,11 +498,19 @@ const App: React.FC = () => {
     // COMPARE PAYSLIPS - Navigate to Compare view
     //
     const handleComparePayslips = (payslipsToCompareArr: [Payslip, Payslip]) => {
-        if (!handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS)) {
+        // Prima controlla i crediti
+        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
+        if (!canProceed) {
             return;
         }
+        
+        // Imposta le buste paga da confrontare e naviga
         setPayslipsToCompare(payslipsToCompareArr);
-        setCurrentView(View.Compare);
+        
+        // Naviga alla vista Confronto
+        setTimeout(() => {
+            setCurrentView(View.Compare);
+        }, 0);
     };
 
     //
