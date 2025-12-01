@@ -39,18 +39,21 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio Buste Paga</h1>
-                <button 
-                    onClick={handleCompareClick}
-                    disabled={selectedForCompare.length !== 2}
-                    className={`px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md transition-colors whitespace-nowrap ${
-                        selectedForCompare.length === 2 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer' 
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                >
-                    <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/2)</span>
-                    <span className="sm:hidden">Confronta ({selectedForCompare.length}/2)</span>
-                </button>
+                {selectedForCompare.length === 2 ? (
+                    <button 
+                        type="button"
+                        onClick={handleCompareClick}
+                        className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                        <span className="hidden sm:inline">Confronta Selezionati (2/2)</span>
+                        <span className="sm:hidden">Confronta (2/2)</span>
+                    </button>
+                ) : (
+                    <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
+                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/2)</span>
+                        <span className="sm:hidden">Confronta ({selectedForCompare.length}/2)</span>
+                    </span>
+                )}
             </div>
             
             {payslips.length === 0 ? (

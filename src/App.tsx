@@ -248,6 +248,25 @@ const App: React.FC = () => {
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     //
+    // PERSIST LOCAL DATA TO LOCALSTORAGE
+    //
+    useEffect(() => {
+        localStorage.setItem("gioia_payslips", JSON.stringify(payslips));
+    }, [payslips]);
+
+    useEffect(() => {
+        localStorage.setItem("gioia_shifts", JSON.stringify(shifts));
+    }, [shifts]);
+
+    useEffect(() => {
+        localStorage.setItem("gioia_leave_plans", JSON.stringify(leavePlans));
+    }, [leavePlans]);
+
+    useEffect(() => {
+        localStorage.setItem("gioia_absences", JSON.stringify(absences));
+    }, [absences]);
+
+    //
     // REMOVE MONTHLY RESET (PIANO A)
     // → Nessun reset. Nessun credito gratis.
     //
