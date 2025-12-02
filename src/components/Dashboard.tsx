@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Payslip, PayItem } from '../types.ts';
 import Card from './common/Card.tsx';
-import { WalletIcon, TaxIcon, EuroIcon, InfoIcon, TfrIcon, BeachIcon, ChartBarIcon, PdfIcon, TrendingUpIcon, LayersIcon } from './common/Icons.tsx';
-import SalaryChart from './SalaryChart.tsx';
+import { WalletIcon, TaxIcon, EuroIcon, InfoIcon, TfrIcon, BeachIcon, ChartBarIcon, PdfIcon, TrendingUpIcon, LayersIcon, ChatIcon, CloseIcon } from './common/Icons.tsx';
 import Assistant from './Assistant.tsx';
-import EvolutionChart from './EvolutionChart.tsx';
 import { getPayslipSummary } from '../services/geminiService.ts';
 import PdfReport from './PdfReport.tsx';
 import Spinner from './common/Spinner.tsx';
@@ -59,6 +57,7 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
     const [activeTab, setActiveTab] = useState<'overview' | 'historical'>('overview');
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [pdfSummary, setPdfSummary] = useState<string | null>(null);
+    const [isAssistantOpen, setIsAssistantOpen] = useState(false);
     const pdfReportRef = useRef<HTMLDivElement>(null);
 
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
@@ -254,30 +253,6 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
                         <Card title="Stipendio Netto" value={payslip.netSalary} icon={<WalletIcon />} color="green" />
                     </div>
                     
-                    {/* Charts Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
-                        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-xl shadow-md">
-                            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
-                                <ChartBarIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-500"/>
-                                Ripartizione Lordo
-                            </h2>
-                            <SalaryChart payslip={payslip} />
-                        </div>
-                        <div className="lg:col-span-3 bg-white p-4 sm:p-6 rounded-xl shadow-md">
-                            <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
-                                <ChartBarIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-indigo-500"/>
-                                Andamento Stipendio
-                            </h2>
-                            {payslips.length > 1 ? (
-                                <EvolutionChart payslips={payslips} />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-gray-500 text-sm sm:text-base p-4">
-                                <p className="text-center">Carica altre buste paga per vedere l'andamento nel tempo.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                     {/* Pay Items Details */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-6 sm:mb-8">
                         <PayItemTable title="Competenze" items={payslip.incomeItems} colorClass="text-green-600" />
@@ -360,10 +335,6 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
                         </div>
                     </div>
 
-                    {/* Contextual Assistant Section */}
-                    <div className="mt-8">
-                        <Assistant mode="contextual" focusedPayslip={payslip} payslips={[]} handleCreditConsumption={handleCreditConsumption} />
-                    </div>
                 </div>
             )}
             
@@ -371,6 +342,42 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
                 <HistoricalAnalysis currentPayslip={payslip} allPayslips={payslips} handleCreditConsumption={handleCreditConsumption} />
             )}
 
+            {/* Floating Assistant Button */}
+            <button
+                onClick={() => setIsAssistantOpen(true)}
+                className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center z-40 group"
+                title="Chiedi all'assistente"
+            >
+                <ChatIcon className="w-7 h-7" />
+                <span className="absolute right-full mr-3 bg-gray-800 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    Chiedi all'assistente
+                </span>
+            </button>
+
+            {/* Assistant Modal */}
+            {isAssistantOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="bg-white w-full sm:w-[500px] md:w-[600px] h-[85vh] sm:h-[80vh] sm:max-h-[700px] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700">
+                            <div className="flex items-center">
+                                <ChatIcon className="w-6 h-6 text-white mr-2" />
+                                <h2 className="text-lg font-semibold text-white">Assistente GioIA</h2>
+                            </div>
+                            <button
+                                onClick={() => setIsAssistantOpen(false)}
+                                className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1 transition-colors"
+                            >
+                                <CloseIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-hidden">
+                            <Assistant mode="contextual" focusedPayslip={payslip} payslips={[]} handleCreditConsumption={handleCreditConsumption} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

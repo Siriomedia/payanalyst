@@ -24,6 +24,9 @@ export const MenuIcon: React.FC<{className?: string}> = ({className = "w-6 h-6"}
 export const CloseIcon: React.FC<{className?: string}> = ({className = "w-6 h-6"}) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
 );
+export const ChatIcon: React.FC<{className?: string}> = ({className = "w-6 h-6"}) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+);
 export const LogoIcon: React.FC<{className?: string}> = ({className = "w-8 h-8"}) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5-10-5-10 5z" opacity="0.6" /><path d="M12 12l10 5 10-5-10-5-10 5z" /></svg>
 );
