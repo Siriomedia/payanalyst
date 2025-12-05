@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ChatMessage, Payslip, HistoricalAnalysisResult } from "../types.ts";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY! });
 
 const MUNICIPAL_TAX_TABLES_TEXT = `
 Diffusione Limitata
