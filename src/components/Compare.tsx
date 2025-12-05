@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Payslip } from '../types.ts';
-import { CalendarIcon, AssistantIcon } from './common/Icons.tsx';
 import { getComparisonAnalysis } from '../services/geminiService.ts';
 import Spinner from './common/Spinner.tsx';
 import Assistant from './Assistant.tsx';
@@ -77,8 +76,7 @@ const Compare: React.FC<CompareProps> = ({ payslips }) => {
             
             {/* AI Analysis Section */}
             <div className="mb-6 sm:mb-8 bg-white p-4 sm:p-6 rounded-xl shadow-md">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center">
-                    <AssistantIcon className="mr-2 text-blue-500 w-5 h-5 sm:w-6 sm:h-6"/>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
                     Analisi AI
                 </h2>
                 {isAnalysisLoading && (
@@ -98,16 +96,10 @@ const Compare: React.FC<CompareProps> = ({ payslips }) => {
                             <tr className="bg-gray-100 text-left text-gray-600">
                                 <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold">Voce</th>
                                 <th className="py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold">
-                                    <div className="flex items-center justify-center flex-col sm:flex-row">
-                                        <CalendarIcon className="mr-0 sm:mr-2 mb-1 sm:mb-0 w-4 h-4"/>
-                                        <span className="capitalize text-[10px] sm:text-sm">{getMonthName(p1.period.month)} {p1.period.year}</span>
-                                    </div>
+                                    <span className="capitalize text-[10px] sm:text-sm">{getMonthName(p1.period.month)} {p1.period.year}</span>
                                 </th>
                                 <th className="py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold">
-                                    <div className="flex items-center justify-center flex-col sm:flex-row">
-                                        <CalendarIcon className="mr-0 sm:mr-2 mb-1 sm:mb-0 w-4 h-4"/>
-                                        <span className="capitalize text-[10px] sm:text-sm">{getMonthName(p2.period.month)} {p2.period.year}</span>
-                                    </div>
+                                    <span className="capitalize text-[10px] sm:text-sm">{getMonthName(p2.period.month)} {p2.period.year}</span>
                                 </th>
                                 <th className="py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold">Diff.</th>
                             </tr>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Payslip, HistoricalAnalysisResult, MonthlyComparison } from '../types.ts';
 import { getHistoricalAnalysis } from '../services/geminiService.ts';
 import Spinner from './common/Spinner.tsx';
-import { AssistantIcon, TrendingUpIcon, PdfIcon } from './common/Icons.tsx';
+import { PdfIcon } from './common/Icons.tsx';
 import HistoricalAnalysisPdfReport from './HistoricalAnalysisPdfReport.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
 
@@ -168,8 +168,7 @@ const HistoricalAnalysis: React.FC<HistoricalAnalysisProps> = ({ currentPayslip,
             {/* Header con Sintesi e Bottone PDF */}
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center">
-                        <AssistantIcon className="mr-2 text-blue-500 flex-shrink-0"/>
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">
                         Analisi Storica
                     </h2>
                     <button
@@ -195,8 +194,7 @@ const HistoricalAnalysis: React.FC<HistoricalAnalysisProps> = ({ currentPayslip,
 
             {/* Tabella Comparativa Principale */}
             <div className="bg-white rounded-xl shadow-md overflow-hidden">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-800 p-4 sm:p-6 flex items-center border-b border-gray-200">
-                    <TrendingUpIcon className="mr-2 text-indigo-500 flex-shrink-0"/>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 p-4 sm:p-6 border-b border-gray-200">
                     Confronto Mese per Mese
                 </h2>
                 
