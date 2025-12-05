@@ -10,21 +10,10 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Type = "text/html; charset=UTF-8"
     X-Content-Type-Options = "nosniff"
 
 [[headers]]
-  for = "/static/js/*.js"
-  [headers.values]
-    Content-Type = "application/javascript"
-
-[[headers]]
-  for = "/static/css/*.css"
-  [headers.values]
-    Content-Type = "text/css"
-
-[[headers]]
-  for = "/service-worker.js"
+  for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache"
 
@@ -32,3 +21,4 @@
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
