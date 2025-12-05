@@ -1,6 +1,11 @@
 [build]
-  publish = "build"
+  publish = "dist"
   command = "npm run build"
+
+[build.environment]
+  # Firebase client-side API keys are public by design
+  # Security is enforced via Firebase Security Rules, not by hiding the API key
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyCqDyPwhqUQ6kqcbyBdXSrq0D09S7aEw5c"
 
 [[headers]]
   for = "/*"
