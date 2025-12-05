@@ -14,7 +14,7 @@ const baseItems = [
 
 const bottomItems = [
     { id: View.Subscription, label: 'Crediti', icon: <SubscriptionIcon /> },
-    { id: View.Settings, label: 'Impostazioni', icon: <SettingsIcon /> },
+    { id: View.Settings, label: 'Profilo Utente', icon: <SettingsIcon /> },
 ]
 
 export const getNavItems = (user: User | null) => {

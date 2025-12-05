@@ -77,7 +77,7 @@ const Settings: React.FC<SettingsProps> = ({ user, onSave, onPasswordChange }) =
 
     return (
         <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Impostazioni</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Profilo Utente</h1>
             <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
                 {/* User Data Form */}
                 <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">

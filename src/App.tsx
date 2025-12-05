@@ -12,6 +12,7 @@ import LeavePlanner from './components/LeavePlanner.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
 import Subscription from './components/Subscription.tsx';
 import UpgradeModal from './components/UpgradeModal.tsx';
+import ProfileOnboarding from './components/ProfileOnboarding.tsx';
 
 import { View, Payslip, User, Shift, LeavePlan, Absence, Plan } from './types.ts';
 import { PLANS, CREDIT_COSTS } from './config/plans.ts';
@@ -514,6 +515,23 @@ const App: React.FC = () => {
     };
 
     //
+    // HANDLE ONBOARDING COMPLETE
+    //
+    const handleOnboardingComplete = async (updatedData: { firstName: string; lastName: string; dateOfBirth: string; placeOfBirth: string }) => {
+        if (!user || !auth.currentUser) return;
+
+        const updatedUser: User = {
+            ...user,
+            ...updatedData,
+        };
+
+        setUser(updatedUser);
+
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        await setDoc(userRef, updatedData, { merge: true });
+    };
+
+    //
     // LOGOUT
     //
     const handleLogout = async () => {
@@ -535,6 +553,13 @@ const App: React.FC = () => {
     // RENDER
     //
     if (!user) return <Login onLoginSuccess={setUser} />;
+
+    const isProfileComplete = user.dateOfBirth && user.dateOfBirth.trim() !== '' &&
+                              user.placeOfBirth && user.placeOfBirth.trim() !== '';
+
+    if (!isProfileComplete) {
+        return <ProfileOnboarding user={user} onComplete={handleOnboardingComplete} />;
+    }
 
     return (
         <>
@@ -596,7 +621,19 @@ const App: React.FC = () => {
                                 />
                             );
                         case View.Settings:
-                            return <Settings user={user} onSave={() => {}} onPasswordChange={() => Promise.resolve()} />;
+                            return <Settings user={user} onSave={async (updatedData) => {
+                                if (!auth.currentUser) return;
+
+                                const updatedUser: User = {
+                                    ...user,
+                                    ...updatedData,
+                                };
+
+                                setUser(updatedUser);
+
+                                const userRef = doc(db, "users", auth.currentUser.uid);
+                                await setDoc(userRef, updatedData, { merge: true });
+                            }} onPasswordChange={() => Promise.resolve()} />;
                         default:
                             return null;
                     }
