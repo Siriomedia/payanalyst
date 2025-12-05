@@ -11,25 +11,20 @@ const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleStr
 const formatValue = (val: number) => `€ ${val.toFixed(2)}`;
 
 const ComparisonRowPdf: React.FC<{ comparison: MonthlyComparison; isHighlighted?: boolean }> = ({ comparison, isHighlighted }) => {
-    const bgClass = isHighlighted ? 'bg-blue-50' : '';
+    const bgClass = isHighlighted ? 'bg-gray-50' : '';
     const fontClass = comparison.type === 'summary' ? 'font-semibold' : '';
-    
+
     return (
         <tr className={`border-b border-gray-200 text-xs ${bgClass}`}>
             <td className={`py-1.5 px-2 ${fontClass} text-gray-800`}>
-                <div className="flex items-center">
-                    {comparison.type === 'income' && <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>}
-                    {comparison.type === 'deduction' && <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>}
-                    {comparison.type === 'summary' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span>}
-                    {comparison.description}
-                </div>
+                {comparison.description}
             </td>
             {comparison.values.map((val, idx) => {
                 const diff = val.differenceFromPrevious;
                 const showDiff = diff !== null && diff !== 0;
                 const diffColor = diff && diff > 0 ? 'text-green-600' : 'text-red-600';
                 const diffSign = diff && diff > 0 ? '+' : '';
-                
+
                 return (
                     <td key={idx} className={`py-1.5 px-2 text-center font-mono ${fontClass}`}>
                         <span className="text-gray-800">{formatValue(val.value)}</span>
@@ -109,41 +104,19 @@ const HistoricalAnalysisPdfReport: React.FC<HistoricalAnalysisPdfReportProps> = 
                             ))}
                         </tbody>
                     </table>
-                    
-                    {/* Legend */}
-                    <div className="mt-2 flex gap-4 text-[10px] text-gray-600">
-                        <div className="flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1"></span>
-                            Riepilogo
-                        </div>
-                        <div className="flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1"></span>
-                            Competenze
-                        </div>
-                        <div className="flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1"></span>
-                            Trattenute
-                        </div>
-                        <div className="flex items-center">
-                            <span className="text-green-600">(+€)</span> Aumento
-                        </div>
-                        <div className="flex items-center">
-                            <span className="text-red-600">(-€)</span> Diminuzione
-                        </div>
-                    </div>
                 </section>
 
                 {/* Insights */}
                 {analysis.insights && analysis.insights.length > 0 && (
                     <section className="mb-6">
                         <h2 className="text-base font-bold text-gray-800 border-b border-gray-300 pb-1 mb-2">Osservazioni Chiave</h2>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-2">
                             {analysis.insights.map((insight, idx) => (
-                                <div key={idx} className="bg-gray-50 rounded p-2 border border-gray-200">
-                                    <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
+                                <div key={idx} className="border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
+                                    <p className="text-xs font-semibold text-gray-800 mb-0.5">
                                         {insight.category}
                                     </p>
-                                    <p className="text-xs text-gray-700">{insight.observation}</p>
+                                    <p className="text-xs text-gray-600">{insight.observation}</p>
                                 </div>
                             ))}
                         </div>

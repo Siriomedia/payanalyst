@@ -34,18 +34,13 @@ const DifferenceCell: React.FC<{ diff: number | null }> = ({ diff }) => {
 };
 
 const ComparisonRow: React.FC<{ comparison: MonthlyComparison; isHighlighted?: boolean }> = ({ comparison, isHighlighted }) => {
-    const bgClass = isHighlighted ? 'bg-blue-50' : '';
+    const bgClass = isHighlighted ? 'bg-gray-50' : '';
     const fontClass = comparison.type === 'summary' ? 'font-semibold' : '';
-    
+
     return (
-        <tr className={`border-b border-gray-200 last:border-b-0 hover:bg-gray-50/50 ${bgClass}`}>
+        <tr className={`border-b border-gray-200 last:border-b-0 ${bgClass}`}>
             <td className={`py-3 px-3 sm:px-4 sticky left-0 bg-white ${bgClass} ${fontClass} text-gray-800 min-w-[140px] sm:min-w-[180px]`}>
-                <div className="flex items-center">
-                    {comparison.type === 'income' && <span className="w-2 h-2 rounded-full bg-green-500 mr-2 flex-shrink-0"></span>}
-                    {comparison.type === 'deduction' && <span className="w-2 h-2 rounded-full bg-red-500 mr-2 flex-shrink-0"></span>}
-                    {comparison.type === 'summary' && <span className="w-2 h-2 rounded-full bg-blue-500 mr-2 flex-shrink-0"></span>}
-                    <span className="truncate">{comparison.description}</span>
-                </div>
+                <span className="truncate">{comparison.description}</span>
             </td>
             {comparison.values.map((val, idx) => (
                 <td key={idx} className={`py-3 px-2 sm:px-4 text-center font-mono text-sm ${fontClass}`}>
@@ -240,46 +235,19 @@ const HistoricalAnalysis: React.FC<HistoricalAnalysisProps> = ({ currentPayslip,
                         </tbody>
                     </table>
                 </div>
-                
-                {/* Legenda */}
-                <div className="px-4 sm:px-6 py-3 bg-gray-50 border-t border-gray-200 flex flex-wrap gap-4 text-xs text-gray-600">
-                    <div className="flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
-                        Riepilogo
-                    </div>
-                    <div className="flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-                        Competenze
-                    </div>
-                    <div className="flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-red-500 mr-2"></span>
-                        Trattenute
-                    </div>
-                    <div className="flex items-center">
-                        <span className="text-green-600 mr-1">(+€)</span>
-                        Aumento
-                    </div>
-                    <div className="flex items-center">
-                        <span className="text-red-600 mr-1">(-€)</span>
-                        Diminuzione
-                    </div>
-                </div>
             </div>
 
             {/* Osservazioni AI */}
             {analysis.insights && analysis.insights.length > 0 && (
                 <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                        <span className="text-2xl mr-2">💡</span>
-                        Osservazioni Chiave
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Osservazioni Chiave</h3>
+                    <div className="space-y-3">
                         {analysis.insights.map((insight, idx) => (
-                            <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">
+                            <div key={idx} className="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
+                                <p className="text-sm font-semibold text-gray-800 mb-1">
                                     {insight.category}
                                 </p>
-                                <p className="text-sm text-gray-700">{insight.observation}</p>
+                                <p className="text-sm text-gray-600">{insight.observation}</p>
                             </div>
                         ))}
                     </div>
