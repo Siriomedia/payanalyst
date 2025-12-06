@@ -1,7 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ChatMessage, Payslip, HistoricalAnalysisResult } from "../types.ts";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY! });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.error("VITE_GEMINI_API_KEY non trovata. Variabili disponibili:", import.meta.env);
+  throw new Error("VITE_GEMINI_API_KEY non configurata correttamente nel file .env");
+}
+
+console.log("Gemini API Key caricata:", apiKey.substring(0, 10) + "...");
+
+const ai = new GoogleGenAI({ apiKey });
 
 const MUNICIPAL_TAX_TABLES_TEXT = `
 Diffusione Limitata
