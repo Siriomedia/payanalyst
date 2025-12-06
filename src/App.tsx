@@ -457,17 +457,15 @@ const App: React.FC = () => {
             return;
         }
 
-        // Verifica che TUTTI i campi richiesti siano presenti nella busta paga (con controlli sicuri)
+        // Verifica che nome e cognome siano presenti nella busta paga
         const payslipDataComplete =
             newPayslip.employee.firstName && newPayslip.employee.firstName.trim() !== "" &&
-            newPayslip.employee.lastName && newPayslip.employee.lastName.trim() !== "" &&
-            newPayslip.employee.dateOfBirth && newPayslip.employee.dateOfBirth.trim() !== "" &&
-            newPayslip.employee.placeOfBirth && newPayslip.employee.placeOfBirth.trim() !== "";
+            newPayslip.employee.lastName && newPayslip.employee.lastName.trim() !== "";
 
         if (!payslipDataComplete) {
             setAlert(
                 `⚠️ DATI INCOMPLETI NELLA BUSTA PAGA\n\n` +
-                `La busta paga non contiene tutti i dati anagrafici necessari (nome, cognome, data di nascita, luogo di nascita).\n\n` +
+                `La busta paga non contiene nome e cognome del dipendente.\n\n` +
                 `📌 Puoi visualizzare l'analisi temporanea, ma non verrà salvata nell'archivio.\n` +
                 `💡 Assicurati che la busta paga sia leggibile e contenga tutti i dati.`
             );
@@ -475,15 +473,13 @@ const App: React.FC = () => {
             return;
         }
 
-        // Confronto normalizzato di tutti i campi
+        // Confronto normalizzato di nome e cognome
         const firstNameMatch = normalizePlace(newPayslip.employee.firstName) === normalizePlace(user.firstName);
         const lastNameMatch = normalizePlace(newPayslip.employee.lastName) === normalizePlace(user.lastName);
-        const dateOfBirthMatch = normalizeDate(newPayslip.employee.dateOfBirth) === normalizeDate(user.dateOfBirth);
-        const placeOfBirthMatch = normalizePlace(newPayslip.employee.placeOfBirth) === normalizePlace(user.placeOfBirth);
 
-        const allDataMatches = firstNameMatch && lastNameMatch && dateOfBirthMatch && placeOfBirthMatch;
+        const nameMatches = firstNameMatch && lastNameMatch;
 
-        if (allDataMatches) {
+        if (nameMatches) {
             // DATI CORRISPONDENTI → Salva busta paga
             const updated = [...payslips, newPayslip].sort((a, b) => {
                 const dA = new Date(a.period.year, a.period.month - 1);
@@ -494,17 +490,14 @@ const App: React.FC = () => {
             setAlert(null);
         } else {
             // DATI NON CORRISPONDENTI → Solo analisi temporanea
-            let mismatchDetails = "I seguenti dati non corrispondono:\n\n";
-            if (!firstNameMatch) mismatchDetails += `• Nome: "${newPayslip.employee.firstName}" ≠ "${user.firstName}"\n`;
-            if (!lastNameMatch) mismatchDetails += `• Cognome: "${newPayslip.employee.lastName}" ≠ "${user.lastName}"\n`;
-            if (!dateOfBirthMatch) mismatchDetails += `• Data di nascita: "${newPayslip.employee.dateOfBirth}" ≠ "${user.dateOfBirth}"\n`;
-            if (!placeOfBirthMatch) mismatchDetails += `• Luogo di nascita: "${newPayslip.employee.placeOfBirth}" ≠ "${user.placeOfBirth}"\n`;
-
             setAlert(
-                `⚠️ ANALISI TEMPORANEA - DATI NON SALVATI\n\n` +
-                `Questa busta paga non corrisponde ai tuoi dati anagrafici.\n\n` +
-                mismatchDetails +
-                `\n📌 Puoi visualizzare l'analisi ma NON verrà salvata nell'archivio.\n` +
+                `⚠️ NOME E COGNOME NON CORRISPONDENTI\n\n` +
+                `La busta paga analizzata non corrisponde al tuo profilo:\n\n` +
+                `• Nome sulla busta paga: "${newPayslip.employee.firstName}"\n` +
+                `• Nome nel profilo: "${user.firstName}"\n\n` +
+                `• Cognome sulla busta paga: "${newPayslip.employee.lastName}"\n` +
+                `• Cognome nel profilo: "${user.lastName}"\n\n` +
+                `📌 Puoi visualizzare l'analisi ma la busta paga NON verrà salvata nell'archivio.\n\n` +
                 `💡 Se è la tua busta paga, verifica e aggiorna i tuoi dati in Impostazioni.`
             );
         }
