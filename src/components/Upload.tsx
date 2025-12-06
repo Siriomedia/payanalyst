@@ -4,18 +4,21 @@ import { Payslip } from '../types.ts';
 import Spinner from './common/Spinner.tsx';
 import { UploadIcon } from './common/Icons.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
+import { User } from '../types.ts';
 
 interface UploadProps {
+    user: User;
     onAnalysisComplete: (payslip: Payslip) => void;
     handleCreditConsumption: (cost: number) => boolean;
 }
 
-const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsumption }) => {
+const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditConsumption }) => {
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
+    const [showProfileAlert, setShowProfileAlert] = useState(false);
 
     useEffect(() => {
         if (file && file.type.startsWith('image/')) {
@@ -62,6 +65,15 @@ const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsump
         setError(null);
     };
 
+    const isProfileComplete = () => {
+        return (
+            user.firstName.trim() !== '' &&
+            user.lastName.trim() !== '' &&
+            user.dateOfBirth.trim() !== '' &&
+            user.placeOfBirth.trim() !== ''
+        );
+    };
+
     const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
         e.stopPropagation();
@@ -81,12 +93,18 @@ const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsump
             return;
         }
 
+        if (!isProfileComplete()) {
+            setShowProfileAlert(true);
+            return;
+        }
+
         if (!handleCreditConsumption(CREDIT_COSTS.PAYSLIP_ANALYSIS)) {
             return;
         }
 
         setIsLoading(true);
         setError(null);
+        setShowProfileAlert(false);
         try {
             const payslipData = await analyzePayslip(file);
             onAnalysisComplete(payslipData);
@@ -156,6 +174,18 @@ const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsump
                                 <input id="file-upload" name="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
                                 <p className="text-[10px] sm:text-xs text-gray-400 mt-2">PDF, PNG, JPG (MAX. 10MB)</p>
                             </label>
+                        )}
+
+                        {showProfileAlert && (
+                            <div className="mt-4 text-center text-sm sm:text-base text-amber-700 bg-amber-100 border border-amber-300 p-4 rounded-lg">
+                                <div className="flex items-center justify-center mb-2">
+                                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    <span className="font-semibold">Dati del profilo incompleti</span>
+                                </div>
+                                <p>Per analizzare la busta paga, è necessario completare i dati anagrafici nel tuo profilo utente.</p>
+                            </div>
                         )}
 
                         {error && (

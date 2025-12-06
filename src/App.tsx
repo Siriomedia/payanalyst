@@ -605,6 +605,7 @@ const App: React.FC = () => {
                         case View.Upload:
                             return (
                                 <Upload
+                                    user={user}
                                     onAnalysisComplete={handleAnalysisComplete}
                                     handleCreditConsumption={handleCreditConsumption}
                                 />
