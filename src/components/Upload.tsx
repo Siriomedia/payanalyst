@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { analyzePayslip } from '../services/geminiService.ts';
 import { Payslip } from '../types.ts';
 import Spinner from './common/Spinner.tsx';
@@ -12,9 +12,27 @@ interface UploadProps {
 
 const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsumption }) => {
     const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
+
+    useEffect(() => {
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setPreviewUrl(null);
+        }
+        return () => {
+            if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [file]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -37,6 +55,12 @@ const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsump
             }
         }
     }, []);
+
+    const handleRemoveFile = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setError(null);
+    };
 
     const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
@@ -86,26 +110,52 @@ const Upload: React.FC<UploadProps> = ({ onAnalysisComplete, handleCreditConsump
                     </div>
                 ) : (
                     <>
-                        <label
-                            htmlFor="file-upload"
-                            onDrop={handleDrop}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            className={`flex flex-col items-center justify-center w-full p-6 sm:p-8 md:p-10 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}`}
-                        >
-                            <UploadIcon className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mb-3 sm:mb-4" />
-                            <div className="text-center">
-                                <span className="text-sm sm:text-base text-blue-600 font-semibold">Scegli un file</span>
-                                <span className="text-sm sm:text-base text-gray-500 ml-1">o trascinalo qui</span>
+                        {file ? (
+                            <div className="border-2 border-solid border-green-500 bg-green-50 rounded-lg p-6">
+                                <div className="flex flex-col items-center">
+                                    {previewUrl ? (
+                                        <img src={previewUrl} alt="Anteprima" className="max-h-48 max-w-full rounded-lg shadow-md mb-4 object-contain" />
+                                    ) : (
+                                        <div className="w-20 h-20 bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                                            <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                    <div className="text-center mb-4">
+                                        <div className="flex items-center justify-center text-green-600 mb-2">
+                                            <svg className="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span className="font-semibold">File caricato con successo</span>
+                                        </div>
+                                        <p className="text-sm text-gray-700 font-medium break-all">{file.name}</p>
+                                        <p className="text-xs text-gray-500 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    </div>
+                                    <button
+                                        onClick={handleRemoveFile}
+                                        className="text-sm text-red-600 hover:text-red-800 font-medium underline"
+                                    >
+                                        Rimuovi e scegli un altro file
+                                    </button>
+                                </div>
                             </div>
-                            <input id="file-upload" name="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
-                            <p className="text-[10px] sm:text-xs text-gray-400 mt-2">PDF, PNG, JPG (MAX. 10MB)</p>
-                        </label>
-
-                        {file && (
-                            <div className="mt-4 sm:mt-6 text-center font-medium text-sm sm:text-base text-gray-700">
-                                File selezionato: <span className="break-all">{file.name}</span>
-                            </div>
+                        ) : (
+                            <label
+                                htmlFor="file-upload"
+                                onDrop={handleDrop}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                className={`flex flex-col items-center justify-center w-full p-6 sm:p-8 md:p-10 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'}`}
+                            >
+                                <UploadIcon className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mb-3 sm:mb-4" />
+                                <div className="text-center">
+                                    <span className="text-sm sm:text-base text-blue-600 font-semibold">Scegli un file</span>
+                                    <span className="text-sm sm:text-base text-gray-500 ml-1">o trascinalo qui</span>
+                                </div>
+                                <input id="file-upload" name="file-upload" type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
+                                <p className="text-[10px] sm:text-xs text-gray-400 mt-2">PDF, PNG, JPG (MAX. 10MB)</p>
+                            </label>
                         )}
 
                         {error && (
