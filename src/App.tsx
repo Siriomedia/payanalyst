@@ -23,7 +23,34 @@ import { auth, db } from "./firebase.ts";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, onSnapshot, increment, updateDoc, serverTimestamp } from "firebase/firestore";
 
+const APP_VERSION = "2.0.0";
+
 const App: React.FC = () => {
+    // PULISCI CACHE VECCHIA ALL'AVVIO
+    useEffect(() => {
+        const storedVersion = localStorage.getItem('app_version');
+        if (storedVersion !== APP_VERSION) {
+            console.log('Nuova versione rilevata, pulizia cache...');
+
+            // Mantieni solo le chiavi essenziali
+            const keepKeys = ['firebaseAuth'];
+            const allKeys = Object.keys(localStorage);
+
+            allKeys.forEach(key => {
+                if (!keepKeys.includes(key) && !key.startsWith('firebase:')) {
+                    localStorage.removeItem(key);
+                }
+            });
+
+            localStorage.setItem('app_version', APP_VERSION);
+
+            // Ricarica pagina per applicare pulizia
+            if (storedVersion) {
+                window.location.reload();
+                return;
+            }
+        }
+    }, []);
     const [currentView, setCurrentView] = useState<View>(View.Dashboard);
     const isUpdatingFromFirestore = useRef(false);
     const isAtomicCreditUpdate = useRef(false);

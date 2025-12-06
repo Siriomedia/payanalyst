@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { 
-    getAuth, 
+import {
+    getAuth,
     GoogleAuthProvider,
     setPersistence,
-    browserLocalPersistence 
+    browserSessionPersistence
 } from "firebase/auth";
 
 import { getFirestore } from "firebase/firestore";
@@ -29,8 +29,8 @@ const app = initializeApp(firebaseConfig);
 // ================================
 export const auth = getAuth(app);
 
-// Persistenza locale (importantissimo per PWA e app standalone)
-setPersistence(auth, browserLocalPersistence);
+// Persistenza sessione (evita cache vecchia tra riavvii)
+setPersistence(auth, browserSessionPersistence);
 
 // Provider Google (login con popup)
 export const googleProvider = new GoogleAuthProvider();

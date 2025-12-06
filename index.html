@@ -28,6 +28,34 @@
 <body class="bg-gray-100 text-gray-800">
   <div id="root"></div>
 
+  <script>
+    // PULIZIA TOTALE CACHE
+    (function() {
+      // Rimuovi Service Workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+
+      // Pulisci sessionStorage
+      try {
+        sessionStorage.clear();
+      } catch(e) {}
+
+      // Pulisci cache API
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) {
+            caches.delete(name);
+          }
+        });
+      }
+    })();
+  </script>
+
   <script type="module" src="/src/index.tsx"></script>
 
 </body>
