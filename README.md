@@ -1,21 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# GioIA 1.0
 
-# Run and deploy your AI Studio app
+Applicazione di gestione buste paga con AI Assistant integrato.
 
-This contains everything you need to run your app locally.
+## Tecnologie
 
-View your app in AI Studio: https://ai.studio/apps/drive/1fy6N-UxQniWXjPTOgf_bylH3db9aYwbv
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS
+- **Database**: Firebase Firestore
+- **AI**: Google Gemini API
+- **Charts**: Recharts
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js 20+
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+   ```bash
+   npm install
+   ```
+
+2. Configure `.env`:
+   ```
+   VITE_GEMINI_API_KEY=your_gemini_api_key
+   ```
+
 3. Run the app:
-   `npm run dev`
-"# GioIA1.0" 
+   ```bash
+   npm run dev
+   ```
+
+4. Build for production:
+   ```bash
+   npm run build
+   ``` 
