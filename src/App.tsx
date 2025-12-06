@@ -368,12 +368,14 @@ const App: React.FC = () => {
 
         // Admin bypassa tutti i controlli
         if (user && user.role === "admin") {
+            console.log('🔑 UTENTE ADMIN: Bypassa controlli e salva sempre');
             const updated = [...payslips, newPayslip].sort((a, b) => {
                 const dA = new Date(a.period.year, a.period.month - 1);
                 const dB = new Date(b.period.year, b.period.month - 1);
                 return dB.getTime() - dA.getTime();
             });
             setPayslips(updated);
+            console.log('✅ Admin: Busta paga salvata. Archivio contiene', updated.length, 'buste paga');
             setAlert(null);
             setCurrentView(View.Dashboard);
             return;
@@ -435,21 +437,17 @@ const App: React.FC = () => {
                 .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Rimuovi accenti per confronto uniforme
         };
 
-        // Verifica che TUTTI i campi richiesti siano presenti nel profilo (con controlli sicuri)
-        const userProfileComplete = 
+        // Verifica che nome e cognome siano presenti nel profilo
+        const userProfileComplete =
             user.firstName && user.firstName.trim() !== "" &&
-            user.lastName && user.lastName.trim() !== "" &&
-            user.dateOfBirth && user.dateOfBirth.trim() !== "" &&
-            user.placeOfBirth && user.placeOfBirth.trim() !== "";
+            user.lastName && user.lastName.trim() !== "";
 
         if (!userProfileComplete) {
             setAlert(
                 `⚠️ PROFILO INCOMPLETO - IMPOSSIBILE SALVARE\n\n` +
                 `Per salvare le buste paga nell'archivio, devi completare il tuo profilo in Impostazioni con:\n\n` +
                 `• Nome\n` +
-                `• Cognome\n` +
-                `• Data di nascita\n` +
-                `• Luogo di nascita\n\n` +
+                `• Cognome\n\n` +
                 `📌 Puoi visualizzare l'analisi temporanea, ma non verrà salvata nell'archivio.\n` +
                 `💡 Vai in Impostazioni e completa i tuoi dati anagrafici.`
             );
@@ -479,26 +477,40 @@ const App: React.FC = () => {
 
         const nameMatches = firstNameMatch && lastNameMatch;
 
+        console.log('=== CONFRONTO DATI ANAGRAFICI ===');
+        console.log('Busta paga - Nome:', newPayslip.employee.firstName, '→ Normalizzato:', normalizePlace(newPayslip.employee.firstName));
+        console.log('Profilo - Nome:', user.firstName, '→ Normalizzato:', normalizePlace(user.firstName));
+        console.log('Nome corrisponde?', firstNameMatch);
+        console.log('Busta paga - Cognome:', newPayslip.employee.lastName, '→ Normalizzato:', normalizePlace(newPayslip.employee.lastName));
+        console.log('Profilo - Cognome:', user.lastName, '→ Normalizzato:', normalizePlace(user.lastName));
+        console.log('Cognome corrisponde?', lastNameMatch);
+        console.log('Risultato finale - Salva in archivio?', nameMatches);
+
         if (nameMatches) {
             // DATI CORRISPONDENTI → Salva busta paga
+            console.log('✅ SALVATAGGIO IN ARCHIVIO: Nome e cognome corrispondono');
             const updated = [...payslips, newPayslip].sort((a, b) => {
                 const dA = new Date(a.period.year, a.period.month - 1);
                 const dB = new Date(b.period.year, b.period.month - 1);
                 return dB.getTime() - dA.getTime();
             });
             setPayslips(updated);
+            console.log('✅ Busta paga salvata. Archivio ora contiene', updated.length, 'buste paga');
             setAlert(null);
         } else {
-            // DATI NON CORRISPONDENTI → Solo analisi temporanea
+            // DATI NON CORRISPONDENTI → Solo analisi temporanea, NON salvare
+            console.log('❌ NON SALVATO: Nome e/o cognome NON corrispondono');
+            console.log('❌ La busta paga NON viene aggiunta all\'archivio');
             setAlert(
-                `⚠️ NOME E COGNOME NON CORRISPONDENTI\n\n` +
-                `La busta paga analizzata non corrisponde al tuo profilo:\n\n` +
+                `⚠️ ATTENZIONE: DATI NON CORRISPONDENTI\n\n` +
+                `I dati di questa busta paga NON corrispondono all'utente registrato:\n\n` +
                 `• Nome sulla busta paga: "${newPayslip.employee.firstName}"\n` +
-                `• Nome nel profilo: "${user.firstName}"\n\n` +
+                `• Nome nel tuo profilo: "${user.firstName}"\n\n` +
                 `• Cognome sulla busta paga: "${newPayslip.employee.lastName}"\n` +
-                `• Cognome nel profilo: "${user.lastName}"\n\n` +
-                `📌 Puoi visualizzare l'analisi ma la busta paga NON verrà salvata nell'archivio.\n\n` +
-                `💡 Se è la tua busta paga, verifica e aggiorna i tuoi dati in Impostazioni.`
+                `• Cognome nel tuo profilo: "${user.lastName}"\n\n` +
+                `✅ Puoi visualizzare l'analisi della busta paga\n` +
+                `❌ I dati NON verranno salvati nell'archivio\n\n` +
+                `💡 Se questa è la tua busta paga, aggiorna i tuoi dati in Impostazioni.`
             );
         }
 
