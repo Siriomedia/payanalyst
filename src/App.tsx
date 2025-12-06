@@ -364,6 +364,13 @@ const App: React.FC = () => {
     // ANALYSIS COMPLETE - VERIFICA CORRISPONDENZA DATI ANAGRAFICI
     //
     const handleAnalysisComplete = (newPayslip: Payslip) => {
+        console.log('======================================');
+        console.log('CHIAMATA handleAnalysisComplete');
+        console.log('Busta paga - Nome:', newPayslip.employee.firstName, 'Cognome:', newPayslip.employee.lastName);
+        console.log('Profilo utente - Nome:', user?.firstName, 'Cognome:', user?.lastName);
+        console.log('Utente è admin?', user?.role === 'admin');
+        console.log('======================================');
+
         setSelectedPayslip(newPayslip);
 
         // Admin bypassa tutti i controlli
