@@ -3,7 +3,7 @@ import {
     getAuth,
     GoogleAuthProvider,
     setPersistence,
-    browserSessionPersistence
+    browserLocalPersistence
 } from "firebase/auth";
 
 import { getFirestore } from "firebase/firestore";
@@ -29,8 +29,8 @@ const app = initializeApp(firebaseConfig);
 // ================================
 export const auth = getAuth(app);
 
-// Persistenza sessione (evita cache vecchia tra riavvii)
-setPersistence(auth, browserSessionPersistence);
+// Persistenza sessione permanente (anche dopo chiusura browser)
+setPersistence(auth, browserLocalPersistence);
 
 // Provider Google (login con popup)
 export const googleProvider = new GoogleAuthProvider();
