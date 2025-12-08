@@ -619,62 +619,72 @@ INTESTAZIONE TABELLA (da sinistra a destra):
 │ DEL MESE            │  varie)      │  ignora)     │             │              │
 └──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
 
-🎯 METODO DI LETTURA TABELLARE SEMPLICE:
+🎯 PROCEDURA DI LETTURA RIGA PER RIGA (SEGUI ESATTAMENTE):
 
-LEGGI LA TABELLA COME UN FOGLIO EXCEL, RIGA PER RIGA:
+PASSO 1: IDENTIFICA LE INTESTAZIONI DELLE COLONNE
+Trova le intestazioni in alto alla tabella. Le ultime due colonne sono:
+- Penultima colonna: "TRATTENUTE" (valori negativi, a carico dipendente)
+- Ultima colonna: "COMPETENZE" (valori positivi, a favore dipendente)
 
-Per OGNI RIGA della tabella:
-1️⃣ Prima colonna → nome della voce (es. "F00880 Rimborsi da 730")
-2️⃣ GUARDA SOLO SULLA STESSA RIGA nelle ultime due colonne a destra:
-   - Valore nella colonna "TRATTENUTE"? → deductionItem
-   - Valore nella colonna "COMPETENZE"? → incomeItem
-3️⃣ IGNORA tutte le colonne intermedie (IMPORTO BASE, RIFERIMENTO, anno, ecc.)
-4️⃣ Se la riga NON ha valori in TRATTENUTE né in COMPETENZE → SALTA quella voce
+PASSO 2: DETERMINA LA POSIZIONE ORIZZONTALE DELLE COLONNE
+Nota la posizione X (orizzontale) delle intestazioni "TRATTENUTE" e "COMPETENZE".
+Tutti i valori sotto queste intestazioni appartengono a quella colonna.
 
-⚠️⚠️⚠️ REGOLA FONDAMENTALE:
-Ogni valore appartiene SOLO alla riga in cui si trova.
-NON prendere MAI un valore da una riga e assegnarlo a una voce di un'altra riga.
+PASSO 3: PROCESSA OGNI RIGA UNA ALLA VOLTA
+Per ogni riga del corpo tabella, procedi così:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 ESEMPIO PRATICO DI LETTURA CORRETTA:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A) Leggi il nome della voce nella prima colonna (es. "F00880 Rimborsi da 730")
 
-Documento mostra questa tabella:
-┌────────────────────────────┬──────┬──────────┬─────────────┬──────────────┐
-│ F00880 Rimborsi da 730     │ 2024 │          │             │       60,32  │ ← Riga 1
-│ F02000 Imponibile IRPEF    │      │ 1.256,86 │             │              │ ← Riga 2
-│ F02010 IRPEF lorda         │      │          │     289,08  │              │ ← Riga 3
-│ F02500 Detrazioni lav.dip. │      │   244,19 │             │              │ ← Riga 4
-│ F02703 Indennità L.207/24  │      │          │             │      327,00  │ ← Riga 5
-└────────────────────────────┴──────┴──────────┴─────────────┴──────────────┘
-       ↑                        ↑        ↑            ↑              ↑
-   NOME VOCE              (ignora) (ignora)    TRATTENUTE      COMPETENZE
+B) Controlla se c'è un VALORE NUMERICO sulla STESSA RIGA all'altezza di "TRATTENUTE"
+   - Usa l'ALLINEAMENTO VERTICALE: il valore deve essere alla stessa altezza Y della voce
+   - Usa l'ALLINEAMENTO ORIZZONTALE: il valore deve essere nella stessa posizione X di "TRATTENUTE"
+   - Se SÌ → deductionItem con quel valore
 
-ESTRAZIONE CORRETTA:
-✅ Riga 1: "Rimborsi da 730" → 60,32 nella colonna COMPETENZE
-   → incomeItem: { code: "F00880", description: "Rimborsi da 730", value: 60.32 }
+C) Controlla se c'è un VALORE NUMERICO sulla STESSA RIGA all'altezza di "COMPETENZE"
+   - Usa l'ALLINEAMENTO VERTICALE: il valore deve essere alla stessa altezza Y della voce
+   - Usa l'ALLINEAMENTO ORIZZONTALE: il valore deve essere nella stessa posizione X di "COMPETENZE"
+   - Se SÌ → incomeItem con quel valore
 
-✅ Riga 2: "Imponibile IRPEF" → nessun valore in TRATTENUTE/COMPETENZE → SALTA
-
-✅ Riga 3: "IRPEF lorda" → 289,08 nella colonna TRATTENUTE
-   → deductionItem: { code: "F02010", description: "IRPEF lorda", value: 289.08 }
-
-✅ Riga 4: "Detrazioni lav.dip." → nessun valore in TRATTENUTE/COMPETENZE → SALTA
-
-✅ Riga 5: "Indennità L.207/24" → 327,00 nella colonna COMPETENZE
-   → incomeItem: { code: "F02703", description: "Indennità L.207/24", value: 327.00 }
+D) Se NON ci sono valori allineati orizzontalmente con "TRATTENUTE" o "COMPETENZE" → SALTA la riga
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️⚠️⚠️ REGOLE CRITICHE DI ALLINEAMENTO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-❌ ERRORI DA EVITARE:
-• NON usare i valori delle colonne intermedie (1.256,86, 244,19) come valori finali
-• NON prendere 60,32 dalla Riga 1 e metterlo in Riga 5
-• NON confondere i valori tra righe diverse
+1. ALLINEAMENTO VERTICALE (stessa altezza Y):
+   Un valore appartiene a una voce SOLO se si trova alla stessa altezza della voce.
+   Se la voce è sulla riga 3, guarda SOLO i valori sulla riga 3.
 
-✅ COSA FARE:
-• Guarda SOLO le ultime due colonne (TRATTENUTE e COMPETENZE)
-• Ogni voce prende il valore che si trova sulla sua stessa riga
-• Se una riga non ha valori nelle colonne finali, ignora quella voce
+2. ALLINEAMENTO ORIZZONTALE (stessa posizione X):
+   Per sapere se un valore è in TRATTENUTE o COMPETENZE, verifica la sua posizione X.
+   - Se il valore è all'estrema destra → probabilmente COMPETENZE
+   - Se c'è un valore più a sinistra (ma non troppo) → probabilmente TRATTENUTE
+
+3. VERIFICA SPAZIALE:
+   Prima di assegnare un valore a una voce, verifica che:
+   ✓ Il valore è sulla STESSA RIGA ORIZZONTALE della voce
+   ✓ Il valore è nella COLONNA CORRETTA (sotto TRATTENUTE o COMPETENZE)
+   ✓ NON ci sono altre voci tra la voce e il valore sulla stessa riga
+
+4. IGNORA COMPLETAMENTE:
+   - Valori che appaiono nelle colonne centrali (IMPORTO BASE, RIFERIMENTO, ecc.)
+   - Valori che non sono allineati verticalmente con le intestazioni TRATTENUTE/COMPETENZE
+   - Valori che appartengono ad altre righe
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ESEMPIO DI VERIFICA:
+Se vedi "F00880 Rimborsi da 730" sulla riga N:
+1. Guarda SOLO sulla riga N
+2. C'è un valore sotto l'intestazione TRATTENUTE? Se sì, usa quello
+3. C'è un valore sotto l'intestazione COMPETENZE? Se sì, usa quello
+4. NON guardare le altre righe N+1, N+2, ecc.
+
+Se vedi "F02703 Indennità L.207/24" sulla riga M:
+1. Guarda SOLO sulla riga M
+2. C'è un valore sotto l'intestazione TRATTENUTE? Se sì, usa quello
+3. C'è un valore sotto l'intestazione COMPETENZE? Se sì, usa quello
+4. NON usare valori dalle righe precedenti N, N+1, ecc.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔵 SEZIONE 3: RIEPILOGO FINALE (layout misto)
