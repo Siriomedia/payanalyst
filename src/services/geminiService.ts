@@ -452,6 +452,86 @@ const fileToGenerativePart = async (file: File) => {
     };
 };
 
+// Tipi "grezzi" per l'estrazione a 2 step
+
+type RawRemunerationElement = {
+    label: string;   // es. "PAGA BASE"
+    value: string;   // es. "1.429,19"
+};
+
+type RawVoceVariabile = {
+    code: string;         // es. "F00880"
+    description: string;  // es. "Rimborsi da 730"
+    trattenute: string;   // valore nella penultima colonna (TRATTENUTE) o "" se vuota
+    competenze: string;   // valore nell'ultima colonna (COMPETENZE) o "" se vuota
+};
+
+type RawRiepilogo = {
+    stipendioLordo: string;       // "Stipendio lordo" o "Totale competenze"
+    totaleTrattenute: string;     // "Totale trattenute"
+    nettoMese: string;            // "Netto del mese", "Netto in busta"
+
+    // fiscali
+    imponibileFiscale?: string;
+    impostaLorda?: string;
+    detrazioniLavoroDipendente?: string;
+    detrazioniFamiliari?: string;
+    detrazioniTotali?: string;
+    impostaNetta?: string;
+    addizionaleRegionale?: string;
+    addizionaleComunale?: string;
+    addizionaleComunaleAcconto?: string;
+
+    // previdenziali
+    imponibilePrevidenziale?: string;
+    contributiDipendente?: string;
+    contributiAzienda?: string;
+    contributoInail?: string;
+
+    // TFR
+    imponibileTfr?: string;
+    quotaTfr?: string;
+    fondoTfrPrecedente?: string;
+    fondoTfrTotale?: string;
+
+    // ferie / permessi
+    ferieSaldoPrecedente?: string;
+    ferieMaturate?: string;
+    ferieGodute?: string;
+    ferieSaldoResiduo?: string;
+
+    rolSaldoPrecedente?: string;
+    rolMaturati?: string;
+    rolGoduti?: string;
+    rolSaldoResiduo?: string;
+};
+
+type RawHeader = {
+    companyName: string;
+    companyTaxId: string;
+    companyAddress: string;
+
+    employeeFirstName: string;
+    employeeLastName: string;
+    employeeTaxId: string;
+    employeeDateOfBirth?: string;
+    employeePlaceOfBirth?: string;
+
+    level?: string;
+    contractType?: string;
+
+    month: number; // 1-12
+    year: number;
+
+    remunerationElements: RawRemunerationElement[];
+};
+
+type RawPayslip = {
+    header: RawHeader;
+    vociVariabili: RawVoceVariabile[];
+    riepilogo: RawRiepilogo;
+};
+
 const payItemSchema = {
     type: Type.OBJECT,
     properties: {
@@ -472,6 +552,107 @@ const leaveBalanceSchema = {
         balance: { type: Type.NUMBER, description: "Saldo residuo totale (in ORE)." }
     },
     required: ['previous', 'accrued', 'taken', 'balance']
+};
+
+// Schema per Gemini (estrazione grezza)
+const rawPayslipSchema = {
+    type: Type.OBJECT,
+    properties: {
+        header: {
+            type: Type.OBJECT,
+            properties: {
+                companyName: { type: Type.STRING, description: "Ragione sociale dell'azienda." },
+                companyTaxId: { type: Type.STRING, description: "Partita IVA / Codice fiscale dell'azienda." },
+                companyAddress: { type: Type.STRING, description: "Indirizzo completo dell'azienda." },
+                employeeFirstName: { type: Type.STRING, description: "Nome del dipendente." },
+                employeeLastName: { type: Type.STRING, description: "Cognome del dipendente." },
+                employeeTaxId: { type: Type.STRING, description: "Codice fiscale del dipendente." },
+                employeeDateOfBirth: { type: Type.STRING, description: "Data di nascita del dipendente." },
+                employeePlaceOfBirth: { type: Type.STRING, description: "Luogo di nascita del dipendente." },
+                level: { type: Type.STRING, description: "Livello/qualifica contrattuale (se leggibile)." },
+                contractType: { type: Type.STRING, description: "Tipo contratto e CCNL (se leggibile)." },
+                month: { type: Type.INTEGER, description: "Mese di riferimento (1-12)." },
+                year: { type: Type.INTEGER, description: "Anno di riferimento (quattro cifre)." },
+                remunerationElements: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            label: { type: Type.STRING, description: "Nome voce fissa (es. 'PAGA BASE')." },
+                            value: { type: Type.STRING, description: "Valore così come appare (es. '1.429,19')." }
+                        },
+                        required: ["label", "value"]
+                    },
+                    description: "Elementi della retribuzione fissa (Paga base, Contingenza, Scatti, ecc.)."
+                }
+            },
+            required: [
+                "companyName",
+                "companyTaxId",
+                "companyAddress",
+                "employeeFirstName",
+                "employeeLastName",
+                "employeeTaxId",
+                "month",
+                "year",
+                "remunerationElements"
+            ]
+        },
+        vociVariabili: {
+            type: Type.ARRAY,
+            description: "Corpo centrale: una riga per ogni voce variabile della tabella.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    code: { type: Type.STRING, description: "Codice voce (es. 'Z00001', 'F00880')." },
+                    description: { type: Type.STRING, description: "Descrizione voce." },
+                    trattenute: { type: Type.STRING, description: "Importo in colonna TRATTENUTE (penultima colonna) o stringa vuota se assente." },
+                    competenze: { type: Type.STRING, description: "Importo in colonna COMPETENZE (ultima colonna) o stringa vuota se assente." }
+                },
+                required: ["description", "trattenute", "competenze"]
+            }
+        },
+        riepilogo: {
+            type: Type.OBJECT,
+            properties: {
+                stipendioLordo: { type: Type.STRING, description: "Stipendio lordo / Totale competenze del mese." },
+                totaleTrattenute: { type: Type.STRING, description: "Totale trattenute del mese." },
+                nettoMese: { type: Type.STRING, description: "Netto del mese / Netto in busta." },
+
+                imponibileFiscale: { type: Type.STRING },
+                impostaLorda: { type: Type.STRING },
+                detrazioniLavoroDipendente: { type: Type.STRING },
+                detrazioniFamiliari: { type: Type.STRING },
+                detrazioniTotali: { type: Type.STRING },
+                impostaNetta: { type: Type.STRING },
+                addizionaleRegionale: { type: Type.STRING },
+                addizionaleComunale: { type: Type.STRING },
+                addizionaleComunaleAcconto: { type: Type.STRING },
+
+                imponibilePrevidenziale: { type: Type.STRING },
+                contributiDipendente: { type: Type.STRING },
+                contributiAzienda: { type: Type.STRING },
+                contributoInail: { type: Type.STRING },
+
+                imponibileTfr: { type: Type.STRING },
+                quotaTfr: { type: Type.STRING },
+                fondoTfrPrecedente: { type: Type.STRING },
+                fondoTfrTotale: { type: Type.STRING },
+
+                ferieSaldoPrecedente: { type: Type.STRING },
+                ferieMaturate: { type: Type.STRING },
+                ferieGodute: { type: Type.STRING },
+                ferieSaldoResiduo: { type: Type.STRING },
+
+                rolSaldoPrecedente: { type: Type.STRING },
+                rolMaturati: { type: Type.STRING },
+                rolGoduti: { type: Type.STRING },
+                rolSaldoResiduo: { type: Type.STRING }
+            },
+            required: ["stipendioLordo", "totaleTrattenute", "nettoMese"]
+        }
+    },
+    required: ["header", "vociVariabili", "riepilogo"]
 };
 
 const payslipSchema = {
@@ -572,116 +753,100 @@ const payslipSchema = {
 };
 
 
-export const analyzePayslip = async (file: File): Promise<Payslip> => {
+const parseEuroStringToNumber = (raw: string | undefined | null): number => {
+    if (!raw) return 0;
+    const cleaned = raw
+        .toString()
+        .trim()
+        .replace(/\./g, "")   // rimuove separatori migliaia
+        .replace(",", ".")    // converte virgola in punto
+        .replace(/[^\d.-]/g, ""); // rimuove simboli non numerici
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
+};
+
+export const extractRawPayslip = async (file: File): Promise<RawPayslip> => {
     const imagePart = await fileToGenerativePart(file);
 
     const prompt = `
-Sei un sistema OCR avanzato specializzato ESCLUSIVAMENTE nella lettura di buste paga italiane formato "Zucchetti".
-Il tuo compito è leggere il documento e compilare il JSON secondo lo schema fornito.
-NON INVENTARE DATI: se una voce non è presente o non è leggibile, usa 0 per i numeri e stringa vuota per i testi.
+Sei un sistema OCR avanzato specializzato ESCLUSIVAMENTE in buste paga italiane Zucchetti.
+Devi SOLO leggere e riportare i dati in modo tabellare, senza fare calcoli e senza interpretazioni fiscali.
 
-############################################
-# REGOLA DI BASE
-############################################
-1) Prima LEGGI l'intera busta paga con calma.
-2) POI compila il JSON.
-3) Prima di restituire il JSON, CONTROLLA che:
-   - somma(competenze) ≈ STIPENDIO LORDO / TOTALE COMPETENZE
-   - somma(trattenute) ≈ TOTALE TRATTENUTE
-   - STIPENDIO LORDO - TOTALE TRATTENUTE ≈ NETTO DEL MESE
+OBIETTIVO:
+Compila un JSON con tre blocchi:
+1) header
+2) vociVariabili
+3) riepilogo
 
-Se i numeri non tornano, NON correggere inventando importi:
-rileggi con attenzione l'importo visibile accanto alla voce nella busta.
+NON devi verificare i totali, NON devi inventare importi mancanti.
+Se un importo non è chiaramente leggibile, usa una stringa vuota "".
 
-############################################
-# ZONA 1 – TESTATA E ELEMENTI FISSI (LETTURA VERTICALE)
-############################################
-Cerca la sezione "ELEMENTI DELLA RETRIBUZIONE" (o simile).
-Qui la logica è: ETICHETTA SOPRA → VALORE SOTTO.
+########################
+# HEADER
+########################
+- Estrai:
+  - Ragione sociale azienda
+  - Codice fiscale / Partita IVA azienda
+  - Indirizzo azienda
+  - Nome e cognome dipendente
+  - Codice fiscale dipendente
+  - Data di nascita dipendente
+  - Luogo di nascita dipendente
+  - Livello / qualifica (se leggibile)
+  - Tipo contratto / CCNL (se leggibile)
+  - Mese e anno di riferimento
 
-Esempio visivo:
-[PAGA BASE]   [SCATTI]   [CONTING.]   [E.D.R.]   [IND.FUNZ.]
-[1429,19 ]    [ 25,31 ]  [ 530,45 ]   [ 10,33 ]  [ 100,00 ]
+- Estrai anche la sezione "Elementi della Retribuzione" (o simile).
+  Per ogni voce (PAGA BASE, SCATTI, CONTING., E.D.R., IND.FUNZ., ecc.):
+  - label = nome voce (es. "PAGA BASE")
+  - value = valore come appare (es. "1.429,19")
+  Ricorda: ETICHETTA SOPRA, VALORE SOTTO.
 
-Regole:
-- NON leggere valori sulla stessa riga dell'etichetta.
-- Usa SOLO i valori sulla riga SOTTOSTANTE, allineati in verticale.
-- Ogni coppia ETICHETTA + VALORE produce un elemento di "remunerationElements".
+########################
+# VOCI VARIABILI (CORPO CENTRALE)
+########################
+Inizia dalla tabella "VOCI VARIABILI DEL MESE".
+Per OGNI riga della tabella principale:
 
-############################################
-# ZONA 2 – CORPO "VOCI VARIABILI DEL MESE" (LETTURA TABELLARE ORIZZONTALE)
-############################################
-Questa sezione è una tabella.
-Colonne tipiche (da sinistra a destra):
-[Codice + Descrizione] ... [Importo Base] [Riferimento] ... [TRATTENUTE] [COMPETENZE]
+- code: eventuale codice voce (es. "Z00001", "F00880"). Se non presente, usa stringa vuota.
+- description: descrizione completa della voce (es. "Rimborsi da 730").
+- trattenute: importo nella colonna TRATTENUTE (penultima colonna a destra). Se vuota, metti "".
+- competenze: importo nella colonna COMPETENZE (ultima colonna a destra). Se vuota, metti "".
 
-Per OGNI riga DELLA TABELLA:
-1) Leggi il codice voce (es. Z00001, F00880, F02703, ecc.) e la descrizione.
-2) IGNORA le colonne centrali:
-   - "Ore" / "Giorni"
-   - "Base"
-   - "Aliquota"
-   - "Residuo"
-   - qualsiasi numero che non sia nelle DUE COLONNE PIÙ A DESTRA.
-3) Considera SOLO le ultime due colonne:
-   - Penultima colonna = TRATTENUTE → vai in "deductionItems".
-   - Ultima colonna   = COMPETENZE → vai in "incomeItems".
+IGNORA completamente:
+- importi in colonne centrali (Base, Ore, Giorni, Residuo, Aliquota, ecc.).
 
-IMPORTANTE:
-- Non spostare mai un importo da una riga all'altra.
-- Un importo appartiene SEMPRE alla voce che è sulla STESSA RIGA.
+Esempi:
+- "Z00001 Retribuzione":
+  - trattenute = "" (di solito vuota)
+  - competenze = importo grosso a destra (es. "1.170,12").
+- "F00880 Rimborsi da 730":
+  - competenze = importo nella sua colonna COMPETENZE (stessa riga).
+- "F02703 Indennità L.207/24":
+  - trattala come riga propria, con i suoi importi.
 
-CASI PARTICOLARI (tipici Zucchetti):
-- Z00001 Retribuzione:
-  - Il valore centrale piccolo (es. 12,11145) è la paga oraria → IGNORALO.
-  - Il valore valido è quello nella colonna COMPETENZE (ultima a destra, es. 1170,12).
-- F00880 Rimborsi da 730:
-  - È una COMPETENZA → prendi l'importo SOLO dalla colonna COMPETENZE della SUA riga.
-  - NON prendere importi dalle righe sopra o sotto (es. F02703).
-- F02703 Indennità L.207/24:
-  - Tratta questa voce come una riga separata.
-  - Il suo importo è quello nella SUA colonna di TRATTENUTE o COMPETENZE (sulla sua riga).
-- Addizionali IRPEF:
-  - F09110 Addizionale regionale
-  - F09130 Addizionale comunale
-  - F09140 Acconto addiz. comunale
-  Queste sono TRATTENUTE: prendi il valore dalla penultima colonna (TRATTENUTE).
-  Ignora "residuo", "acconto", ecc. nelle colonne centrali: non sono gli importi del mese.
+NON spostare mai un importo da una riga all'altra.
 
-############################################
-# ZONA 3 – PIEDE, TFR E FERIE (LETTURA MISTA)
-############################################
-1) TFR:
-   - Cerca la sezione con diciture tipo "Imponibile TFR", "Quota maturata", "Fondo precedente", "Fondo totale".
-   - Se non trovi valori chiari, imposta tutti i campi numerici TFR a 0.
+########################
+# RIEPILOGO
+########################
+Nella parte bassa del documento (piede), estrai:
 
-2) Ferie e permessi:
-   - Usa la tabella con "Saldo precedente", "Maturato", "Goduto", "Saldo residuo".
-   - Se mancano valori, imposta 0.
+- stipendioLordo: "Stipendio lordo" o "Totale competenze".
+- totaleTrattenute: "Totale trattenute".
+- nettoMese: "Netto del mese" / "Netto in busta".
 
-3) Totali:
-   - Stipendio Lordo (o Totale Competenze)
-   - Totale Trattenute
-   - Netto del Mese / Netto a pagare
-   Questi sono i VALORI DI RIFERIMENTO per validare i tuoi calcoli.
+Se presenti, leggi anche:
+- Imponibile fiscale, Imposta lorda, Detrazioni, Imposta netta, Addizionali.
+- Imponibile previdenziale, contributi dipendente/azienda, INAIL.
+- Dati TFR (imponibile, quota, fondo precedente, fondo totale).
+- Ferie e ROL (saldo precedente, maturato, goduto, saldo residuo).
 
-############################################
-# COMPILAZIONE DELLO SCHEMA
-############################################
-Compila lo schema JSON così:
-- remunerationElements: dalle voci fisse della ZONA 1.
-- incomeItems: tutte le voci con importo COMPETENZE (ZONA 1 + ZONA 2).
-- deductionItems: tutte le voci con importo TRATTENUTE (ZONA 2).
-- grossSalary: usa il "Totale Competenze / Stipendio Lordo" stampato in busta.
-- totalDeductions: usa il "Totale trattenute" stampato in busta.
-- netSalary: deve essere IDENTICO al "Netto del mese / Netto in busta".
-- taxData: compila solo se vedi chiaramente le voci fiscali; altrimenti metti 0 dove non leggibile.
-- socialSecurityData: stessa cosa per INPS/INAIL.
-- tfr e leaveData: se non hai i dati, imposta i numeri a 0 invece di inventare.
+Riporta gli importi esattamente come li leggi (es. "1.588,45").
 
-Ricorda:
-- I numeri devono essere in formato 1234.56 (virgola decimale → punto, separatori migliaia rimossi).
-- Se non sei sicuro di un importo, meglio 0 che un numero inventato.
+NON fare calcoli, NON verificare coerenza: il tuo unico compito è leggere e riportare.
+
+Rispondi SOLO con JSON valido che rispetti lo schema fornito (rawPayslipSchema).
 `;
 
     const response = await ai.models.generateContent({
@@ -692,7 +857,7 @@ Ricorda:
         ],
         config: {
             responseMimeType: "application/json",
-            responseSchema: payslipSchema,
+            responseSchema: rawPayslipSchema,
             temperature: 0.0,
             topP: 0.1,
             topK: 1
@@ -702,28 +867,191 @@ Ricorda:
     const jsonStr = response.text.trim();
 
     try {
-        const payslipData = JSON.parse(jsonStr);
-
-        if (!payslipData.id) {
-            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
-        }
-
-        // Controllo rapido di coerenza (puoi raffinarlo):
-        const gross = Number(payslipData.grossSalary || 0);
-        const ded = Number(payslipData.totalDeductions || 0);
-        const net = Number(payslipData.netSalary || 0);
-        const diff = Math.abs((gross - ded) - net);
-
-        if (gross > 0 && ded >= 0 && net > 0 && diff > 1.5) {
-            console.error("Incongruenza tra lordo, trattenute e netto:", { gross, ded, net, diff });
-            // Qui puoi anche lanciare errore invece di tornare dati incoerenti
-        }
-
-        return payslipData as Payslip;
+        const raw = JSON.parse(jsonStr) as RawPayslip;
+        return raw;
     } catch (e) {
-        console.error("Failed to parse Gemini response as JSON:", jsonStr, e);
-        throw new Error("L'analisi ha prodotto un risultato non valido. Assicurati che il file sia una busta paga chiara.");
+        console.error("Failed to parse raw payslip JSON:", jsonStr, e);
+        throw new Error("L'estrazione grezza della busta paga non è valida. Verifica che il documento sia leggibile.");
     }
+};
+
+export const analyzePayslip = async (file: File): Promise<Payslip> => {
+    // STEP 1: estrazione grezza
+    const raw = await extractRawPayslip(file);
+
+    // Helper per nome completo
+    const firstName = raw.header.employeeFirstName || "";
+    const lastName = raw.header.employeeLastName || "";
+    const dateOfBirth = raw.header.employeeDateOfBirth || "";
+    const placeOfBirth = raw.header.employeePlaceOfBirth || "";
+
+    // STEP 2: mapping deterministico → payslipSchema
+
+    // 2.1. Remuneration elements (ZONA 1)
+    const remunerationElements = (raw.header.remunerationElements || []).map(el => ({
+        description: el.label,
+        quantity: 0,
+        rate: 0,
+        value: parseEuroStringToNumber(el.value)
+    }));
+
+    // 2.2. Voci variabili (ZONA 2) → incomeItems / deductionItems
+    const incomeItems: any[] = [];
+    const deductionItems: any[] = [];
+
+    // Prima: aggiungo le voci fisse anche tra le competenze (come da tuo schema)
+    for (const el of remunerationElements) {
+        incomeItems.push({
+            description: el.description,
+            quantity: el.quantity,
+            rate: el.rate,
+            value: el.value
+        });
+    }
+
+    // Poi: corpo centrale
+    for (const voce of raw.vociVariabili || []) {
+        // competenze
+        const compVal = parseEuroStringToNumber(voce.competenze);
+        if (compVal !== 0) {
+            incomeItems.push({
+                description: voce.description || voce.code || "",
+                quantity: 0,
+                rate: 0,
+                value: compVal
+            });
+        }
+
+        // trattenute
+        const tratVal = parseEuroStringToNumber(voce.trattenute);
+        if (tratVal !== 0) {
+            deductionItems.push({
+                description: voce.description || voce.code || "",
+                quantity: 0,
+                rate: 0,
+                value: tratVal
+            });
+        }
+    }
+
+    // 2.3. Riepilogo numerico (ZONA 3)
+    const riepilogo = raw.riepilogo || ({} as RawRiepilogo);
+
+    const grossFromRiepilogo = parseEuroStringToNumber(riepilogo.stipendioLordo);
+    const deductionsFromRiepilogo = parseEuroStringToNumber(riepilogo.totaleTrattenute);
+    const netFromRiepilogo = parseEuroStringToNumber(riepilogo.nettoMese);
+
+    const grossComputed = incomeItems.reduce((sum, i) => sum + (i.value || 0), 0);
+    const deductionsComputed = deductionItems.reduce((sum, d) => sum + (d.value || 0), 0);
+    const netComputed = grossComputed - deductionsComputed;
+
+    // Scelgo come valore "ufficiale" quelli di riepilogo, ma tengo i calcolati per controlli
+    const grossSalary = grossFromRiepilogo || grossComputed;
+    const totalDeductions = deductionsFromRiepilogo || deductionsComputed;
+    const netSalary = netFromRiepilogo || netComputed;
+
+    // 2.4. taxData mapping minimale (senza inventare)
+    const taxData = {
+        taxableBase: parseEuroStringToNumber(riepilogo.imponibileFiscale),
+        grossTax: parseEuroStringToNumber(riepilogo.impostaLorda),
+        deductions: {
+            employee: parseEuroStringToNumber(riepilogo.detrazioniLavoroDipendente),
+            family: parseEuroStringToNumber(riepilogo.detrazioniFamiliari),
+            total: parseEuroStringToNumber(riepilogo.detrazioniTotali)
+        },
+        netTax: parseEuroStringToNumber(riepilogo.impostaNetta),
+        regionalSurtax: parseEuroStringToNumber(riepilogo.addizionaleRegionale),
+        municipalSurtax: parseEuroStringToNumber(riepilogo.addizionaleComunale)
+    };
+
+    // 2.5. socialSecurityData
+    const socialSecurityData = {
+        taxableBase: parseEuroStringToNumber(riepilogo.imponibilePrevidenziale),
+        employeeContribution: parseEuroStringToNumber(riepilogo.contributiDipendente),
+        companyContribution: parseEuroStringToNumber(riepilogo.contributiAzienda),
+        inailContribution: parseEuroStringToNumber(riepilogo.contributoInail)
+    };
+
+    // 2.6. TFR
+    const tfr = {
+        taxableBase: parseEuroStringToNumber(riepilogo.imponibileTfr),
+        accrued: parseEuroStringToNumber(riepilogo.quotaTfr),
+        previousBalance: parseEuroStringToNumber(riepilogo.fondoTfrPrecedente),
+        totalFund: parseEuroStringToNumber(riepilogo.fondoTfrTotale)
+    };
+
+    // 2.7. Ferie & permessi
+    const leaveData = {
+        vacation: {
+            previous: parseEuroStringToNumber(riepilogo.ferieSaldoPrecedente),
+            accrued: parseEuroStringToNumber(riepilogo.ferieMaturate),
+            taken: parseEuroStringToNumber(riepilogo.ferieGodute),
+            balance: parseEuroStringToNumber(riepilogo.ferieSaldoResiduo)
+        },
+        permits: {
+            previous: parseEuroStringToNumber(riepilogo.rolSaldoPrecedente),
+            accrued: parseEuroStringToNumber(riepilogo.rolMaturati),
+            taken: parseEuroStringToNumber(riepilogo.rolGoduti),
+            balance: parseEuroStringToNumber(riepilogo.rolSaldoResiduo)
+        }
+    };
+
+    // 2.8. Costruzione finale del Payslip secondo payslipSchema
+    const payslip: Payslip = {
+        id: `payslip-${Date.now()}-${Math.random()}`,
+        period: {
+            month: raw.header.month,
+            year: raw.header.year
+        },
+        company: {
+            name: raw.header.companyName,
+            taxId: raw.header.companyTaxId,
+            address: raw.header.companyAddress
+        },
+        employee: {
+            firstName,
+            lastName,
+            taxId: raw.header.employeeTaxId,
+            dateOfBirth,
+            placeOfBirth,
+            level: raw.header.level || "",
+            contractType: raw.header.contractType || ""
+        },
+        remunerationElements,
+        incomeItems,
+        deductionItems,
+        grossSalary,
+        totalDeductions,
+        netSalary,
+        taxData,
+        socialSecurityData,
+        tfr,
+        leaveData
+    };
+
+    // STEP 3 – controlli di coerenza forti (bloccanti o almeno log)
+    const diffNetFromRiepilogo = Math.abs((grossSalary - totalDeductions) - netSalary);
+    const diffGross = Math.abs(grossComputed - grossSalary);
+    const diffDed = Math.abs(deductionsComputed - totalDeductions);
+
+    if (diffNetFromRiepilogo > 1.5 || diffGross > 5 || diffDed > 5) {
+        console.error("Incongruenza dati busta paga:", {
+            grossSalary,
+            totalDeductions,
+            netSalary,
+            grossComputed,
+            deductionsComputed,
+            netComputed,
+            diffNetFromRiepilogo,
+            diffGross,
+            diffDed,
+            raw
+        });
+        // Se vuoi essere ancora più rigido, lancia direttamente:
+        // throw new Error("Busta paga incoerente: i totali non tornano. Rileggere il documento.");
+    }
+
+    return payslip;
 };
 
 export const getComparisonAnalysis = async (p1: Payslip, p2: Payslip): Promise<string> => {
