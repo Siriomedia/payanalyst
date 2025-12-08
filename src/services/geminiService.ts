@@ -502,11 +502,11 @@ const payslipSchema = {
                 lastName: { type: Type.STRING, description: "Cognome del dipendente." },
                 taxId: { type: Type.STRING, description: "Codice Fiscale del dipendente." },
                 dateOfBirth: { type: Type.STRING, description: "Data di nascita del dipendente (formato: GG/MM/AAAA o simile). OBBLIGATORIO: estrai sempre questo campo dalla sezione Dati Anagrafici della busta paga." },
-                placeOfBirth: { type: Type.STRING, description: "Luogo di nascita del dipendente (città o comune). OBBLIGATORIO: estrai sempre questo campo dalla sezione Dati Anagrafici della busta paga." },
+                placeOfBirth: { type: Type.STRING, description: "Luogo di nascita del dipendente (città o comune). Estrarre se presente nella sezione Dati Anagrafici della busta paga." },
                 level: { type: Type.STRING, description: "Livello contrattuale del dipendente." },
                 contractType: { type: Type.STRING, description: "Tipo di contratto (es. 'Commercio', 'Metalmeccanico')." },
             },
-            required: ['firstName', 'lastName', 'taxId', 'dateOfBirth', 'placeOfBirth']
+            required: ['firstName', 'lastName', 'taxId', 'dateOfBirth']
         },
         remunerationElements: { 
             type: Type.ARRAY, 
@@ -741,9 +741,6 @@ CAMPI OBBLIGATORI DA NON LASCIARE VUOTI:
         if (!payslipData.employee.dateOfBirth || payslipData.employee.dateOfBirth.trim() === "") {
             missingFields.push("Data di Nascita");
         }
-        if (!payslipData.employee.placeOfBirth || payslipData.employee.placeOfBirth.trim() === "") {
-            missingFields.push("Luogo di Nascita");
-        }
         
         if (missingFields.length > 0) {
             throw new Error(
@@ -751,7 +748,7 @@ CAMPI OBBLIGATORI DA NON LASCIARE VUOTI:
                 `Non è stato possibile estrarre i seguenti dati dalla busta paga:\n` +
                 `${missingFields.map(f => `• ${f}`).join('\n')}\n\n` +
                 `Verifica che la busta paga contenga chiaramente tutti i dati anagrafici del dipendente ` +
-                `(Nome, Cognome, Data di Nascita, Luogo di Nascita) e riprova con un'immagine più nitida.`
+                `(Nome, Cognome, Codice Fiscale, Data di Nascita) e riprova con un'immagine più nitida.`
             );
         }
         
