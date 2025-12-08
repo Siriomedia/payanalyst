@@ -574,179 +574,55 @@ const payslipSchema = {
 
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
-    const prompt = `Sei un esperto OCR specializzato in buste paga Zucchetti italiane. Devi estrarre TUTTI i dati con PRECISIONE ASSOLUTA.
 
-📍 STRUTTURA DOCUMENTO (3 SEZIONI VERTICALI):
+    // DEFINIZIONE STRATEGICA DEL PROMPT PER BUSTE PAGA ZUCCHETTI
+    const prompt = `
+Sei un sistema OCR avanzato specializzato ESCLUSIVAMENTE nella lettura di buste paga italiane formato "Zucchetti".
+Il tuo compito è estrarre i dati in formato JSON con precisione chirurgica.
+NON INVENTARE DATI. Se un campo è vuoto o illeggibile, restituisci 0 o stringa vuota.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔵 SEZIONE 1: INTESTAZIONE E ANAGRAFICA (layout verticale)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ ISTRUZIONI CRITICHE DI LETTURA VISIVA (SEGUIRE ALLA LETTERA) ⚠️
+Il documento è diviso in 3 zone con REGOLE DI LETTURA DIVERSE. Devi cambiare strategia di lettura mentre scendi nel documento.
 
-VISUALMENTE: Etichetta scritta sopra, valore stampato sotto nella riga successiva.
+--- ZONA 1: INTESTAZIONE E ELEMENTI FISSI (Lettura VERTICALE) ---
+In questa sezione (che include "PAGA BASE", "SCATTI", "CONTINGENZA", "E.D.R.", "TOTALE"), i valori NON sono accanto alle etichette, ma SOTTO.
+1. Cerca l'etichetta (es. "PAGA BASE").
+2. Il valore numerico corrispondente si trova nella RIGA SOTTOSTANTE, allineato verticalmente.
+   Esempio VISIVO:
+   [PAGA BASE]  [CONTING.]
+   [1.429,19 ]  [ 530,45 ]
+-> Estrai questi valori per popolare l'array "remunerationElements".
 
-ESTRAI CON PRECISIONE:
-• Codice Azienda + Ragione Sociale azienda
-• Indirizzo completo azienda (via, città, CAP)
-• Codice Fiscale azienda
-• Posizione INPS + PAT INAIL azienda
-• Codice dipendente + Nome completo dipendente (COGNOME NOME)
-• Codice Fiscale dipendente
-• Data di Nascita (formato GG-MM-AAAA)
-• Data Assunzione (formato GG-MM-AAAA)
-• Qualifica contrattuale
-• Livello contrattuale
-• Tipo contratto part-time/full-time (con percentuale)
+--- ZONA 2: CORPO CENTRALE "VOCI VARIABILI" (Lettura ORIZZONTALE TABELLARE) ---
+Questa sezione inizia con l'intestazione "VOCI VARIABILI DEL MESE". Qui vige una rigorosa logica TABELLARE.
+Le colonne sono (da sinistra a destra): [Voce] [Importo Base] [Riferimento] [TRATTENUTE] [COMPETENZE].
+PER OGNI RIGA:
+1. Leggi la descrizione della voce a sinistra.
+2. Scorri verso destra SULLA STESSA RIGA ESATTA.
+3. IGNORA le colonne "Importo Base" e "Riferimento" (colonne centrali).
+4. Cerca valori solo nelle ultime due colonne a destra:
+   - Penultima colonna = TRATTENUTE (Metti in "deductionItems").
+   - Ultima colonna = COMPETENZE (Metti in "incomeItems").
+5. IMPORTANTE: Se una voce (es. "Rimborsi da 730") ha un valore, questo sarà molto a destra. Non confonderlo con i valori delle colonne centrali.
 
-POI TROVA IL RIQUADRO "ELEMENTI DELLA RETRIBUZIONE":
-Qui ci sono LE VOCI FISSE mensili disposte in COLONNE ORIZZONTALI:
-- PAGA BASE: [valore sotto]
-- SCATTI: [valore sotto]
-- CONTING.: [valore sotto]
-- E.D.R.: [valore sotto]
-- IND.FUNZ.: [valore sotto]
-- Altri elementi fissi...
-- TOTALE: [somma elementi]
+--- ZONA 3: PIEDE E TFR (Lettura Mista) ---
+1. Sezione TFR: è una tabella orizzontale (Fondo 31/12, Rivalutazione, Quota Anno).
+2. Totali finali (es. "TOTALE COMPETENZE", "NETTO DEL MESE"): Spesso seguono la logica verticale (Etichetta sopra, Valore sotto) o sono in caselle ben distinte.
+3. Sezione Ferie/Permessi: Tabella orizzontale (Residuo AP, Maturato, Goduto, Saldo).
 
-⚠️ QUESTI VALORI vanno in "remunerationElements" con description (es. "Paga Base") e value.
+--- FORMATO JSON RICHIESTO ---
+Rispondi SOLO con il JSON valido che rispetta lo schema seguente.
+Schema dati:
+- remunerationElements: Voci fisse (Paga base, ecc. prese dalla ZONA 1).
+- incomeItems: Voci positive variabili (prese dalla colonna COMPETENZE della ZONA 2) + le voci fisse.
+- deductionItems: Voci negative (prese dalla colonna TRATTENUTE della ZONA 2, es. Contributi, Trattenute Sindacali, Addizionali).
+- taxData: Dettaglio IRPEF (Imponibile, Imposta Lorda, Detrazioni, Netta). Cerca le voci che iniziano con "F..." nel corpo o nel riepilogo fiscale.
+- socialSecurityData: Imponibile INPS e Contributi (cerca voce "Contributo IVS" o totali in basso).
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔵 SEZIONE 2: TABELLA VOCI VARIABILI - LETTURA TABELLARE RIGA PER RIGA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-INTESTAZIONE TABELLA (da sinistra a destra):
-┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
-│ VOCI VARIABILI      │ (colonne     │  intermedie  │ TRATTENUTE  │ COMPETENZE   │
-│ DEL MESE            │  varie)      │  ignora)     │             │              │
-└──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
-
-🎯 PROCEDURA DI LETTURA RIGA PER RIGA (SEGUI ESATTAMENTE):
-
-PASSO 1: IDENTIFICA LE INTESTAZIONI DELLE COLONNE
-Trova le intestazioni in alto alla tabella. Le ultime due colonne sono:
-- Penultima colonna: "TRATTENUTE" (valori negativi, a carico dipendente)
-- Ultima colonna: "COMPETENZE" (valori positivi, a favore dipendente)
-
-PASSO 2: DETERMINA LA POSIZIONE ORIZZONTALE DELLE COLONNE
-Nota la posizione X (orizzontale) delle intestazioni "TRATTENUTE" e "COMPETENZE".
-Tutti i valori sotto queste intestazioni appartengono a quella colonna.
-
-PASSO 3: PROCESSA OGNI RIGA UNA ALLA VOLTA
-Per ogni riga del corpo tabella, procedi così:
-
-A) Leggi il nome della voce nella prima colonna (es. "F00880 Rimborsi da 730")
-
-B) Controlla se c'è un VALORE NUMERICO sulla STESSA RIGA all'altezza di "TRATTENUTE"
-   - Usa l'ALLINEAMENTO VERTICALE: il valore deve essere alla stessa altezza Y della voce
-   - Usa l'ALLINEAMENTO ORIZZONTALE: il valore deve essere nella stessa posizione X di "TRATTENUTE"
-   - Se SÌ → deductionItem con quel valore
-
-C) Controlla se c'è un VALORE NUMERICO sulla STESSA RIGA all'altezza di "COMPETENZE"
-   - Usa l'ALLINEAMENTO VERTICALE: il valore deve essere alla stessa altezza Y della voce
-   - Usa l'ALLINEAMENTO ORIZZONTALE: il valore deve essere nella stessa posizione X di "COMPETENZE"
-   - Se SÌ → incomeItem con quel valore
-
-D) Se NON ci sono valori allineati orizzontalmente con "TRATTENUTE" o "COMPETENZE" → SALTA la riga
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️⚠️⚠️ REGOLE CRITICHE DI ALLINEAMENTO:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. ALLINEAMENTO VERTICALE (stessa altezza Y):
-   Un valore appartiene a una voce SOLO se si trova alla stessa altezza della voce.
-   Se la voce è sulla riga 3, guarda SOLO i valori sulla riga 3.
-
-2. ALLINEAMENTO ORIZZONTALE (stessa posizione X):
-   Per sapere se un valore è in TRATTENUTE o COMPETENZE, verifica la sua posizione X.
-   - Se il valore è all'estrema destra → probabilmente COMPETENZE
-   - Se c'è un valore più a sinistra (ma non troppo) → probabilmente TRATTENUTE
-
-3. VERIFICA SPAZIALE:
-   Prima di assegnare un valore a una voce, verifica che:
-   ✓ Il valore è sulla STESSA RIGA ORIZZONTALE della voce
-   ✓ Il valore è nella COLONNA CORRETTA (sotto TRATTENUTE o COMPETENZE)
-   ✓ NON ci sono altre voci tra la voce e il valore sulla stessa riga
-
-4. IGNORA COMPLETAMENTE:
-   - Valori che appaiono nelle colonne centrali (IMPORTO BASE, RIFERIMENTO, ecc.)
-   - Valori che non sono allineati verticalmente con le intestazioni TRATTENUTE/COMPETENZE
-   - Valori che appartengono ad altre righe
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ESEMPIO DI VERIFICA:
-Se vedi "F00880 Rimborsi da 730" sulla riga N:
-1. Guarda SOLO sulla riga N
-2. C'è un valore sotto l'intestazione TRATTENUTE? Se sì, usa quello
-3. C'è un valore sotto l'intestazione COMPETENZE? Se sì, usa quello
-4. NON guardare le altre righe N+1, N+2, ecc.
-
-Se vedi "F02703 Indennità L.207/24" sulla riga M:
-1. Guarda SOLO sulla riga M
-2. C'è un valore sotto l'intestazione TRATTENUTE? Se sì, usa quello
-3. C'è un valore sotto l'intestazione COMPETENZE? Se sì, usa quello
-4. NON usare valori dalle righe precedenti N, N+1, ecc.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔵 SEZIONE 3: RIEPILOGO FINALE (layout misto)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VISIVAMENTE: Tabelle riepilogative con etichette a sinistra/sopra e valori a destra/sotto.
-
-1️⃣ PROGRESSIVI (spesso in una riga orizzontale):
-┌──────────────┬──────────────┬──────────────┬──────────────┐
-│  Imp. INPS   │  Imp. INAIL  │  Imp. IRPEF  │ IRPEF pagata │
-│   [valore]   │   [valore]   │   [valore]   │   [valore]   │
-└──────────────┴──────────────┴──────────────┴──────────────┘
-
-2️⃣ TFR (se presente, cerca sezione "TFR" o "T.F.R."):
-- Imponibile TFR mese
-- Fondo al 31/12 anno precedente
-- Quota anno/Accantonamento anno → questo va in "accrued"
-- Fondo totale aggiornato
-
-3️⃣ FERIE, PERMESSI, EX FESTIVITÀ (cerca sezione con colonne):
-TUTTI i valori sono in ORE (non giorni)!
-┌─────────────┬─────────────┬──────────────┬─────────┬──────────┐
-│             │ Precedente  │ Maturato Anno│ Goduto  │ Residuo  │
-│ Ferie       │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
-│ Permessi    │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
-│ Ex Fest.    │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
-└─────────────┴─────────────┴──────────────┴─────────┴──────────┘
-⚠️ "Maturato Anno" = TOTALE progressivo annuale, NON solo mese corrente!
-
-4️⃣ TOTALI FINALI (solitamente in un riquadro in basso a destra):
-┌──────────────────────────┬────────────┐
-│ TOTALE COMPETENZE        │  [valore]  │
-│ TOTALE TRATTENUTE        │  [valore]  │
-│ ARROTONDAMENTO           │  [valore]  │
-│ NETTO DEL MESE           │  [valore]€ │
-└──────────────────────────┴────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ VALIDAZIONE FINALE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VERIFICA MATEMATICA:
-✓ grossSalary = somma di TUTTE le voci in colonna COMPETENZE
-✓ totalDeductions = somma di TUTTE le voci in colonna TRATTENUTE
-✓ netSalary ≈ grossSalary - totalDeductions (±1€ per arrotondamenti)
-
-CAMPI OBBLIGATORI DA NON LASCIARE VUOTI:
-✓ Nome e Cognome dipendente (dalla sezione 1)
-✓ Codice Fiscale dipendente (dalla sezione 1)
-✓ Data di Nascita (dalla sezione 1, formato GG-MM-AAAA)
-✓ Luogo di Nascita (se presente nella sezione 1)
-✓ remunerationElements (dal riquadro Elementi Retribuzione in sezione 1)
-✓ incomeItems (da colonna COMPETENZE in sezione 2)
-✓ deductionItems (da colonna TRATTENUTE in sezione 2)
-
-📊 FORMATTAZIONE NUMERI:
-- Converti valori con virgola (1.234,56) → numero decimale (1234.56)
-- Rimuovi simboli €, punti separatori migliaia
-- Usa 0 SOLO se il campo è veramente assente nel documento
-- Genera un UUID per il campo 'id'
-
-🔍 ANALIZZA IL DOCUMENTO CON ATTENZIONE MILLIMETRICA. OGNI NUMERO DEVE CORRISPONDERE ALLA VOCE CORRETTA.`;
+REGOLE DI VALIDAZIONE:
+- Il campo "netSalary" deve corrispondere esattamente al "NETTO DEL MESE" stampato in grande in fondo.
+- I numeri devono essere convertiti in formato standard (es. "1.400,50" diventa 1400.50).
+`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -756,52 +632,23 @@ CAMPI OBBLIGATORI DA NON LASCIARE VUOTI:
         ],
         config: {
             responseMimeType: "application/json",
-            responseSchema: payslipSchema
+            responseSchema: payslipSchema,
+            // Abbassiamo la temperature per renderlo più deterministico e meno "creativo"
+            temperature: 0.1
         }
     });
-    
+
     const jsonStr = response.text.trim();
     try {
         const payslipData = JSON.parse(jsonStr);
-        
+
         // Fallback ID generation
         if (!payslipData.id) {
            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
         }
-        
-        // Validazione dati anagrafici obbligatori
-        if (!payslipData.employee) {
-            throw new Error("ERRORE: Gemini non ha estratto i dati del dipendente dalla busta paga.");
-        }
-        
-        const missingFields = [];
-        if (!payslipData.employee.firstName || payslipData.employee.firstName.trim() === "") {
-            missingFields.push("Nome");
-        }
-        if (!payslipData.employee.lastName || payslipData.employee.lastName.trim() === "") {
-            missingFields.push("Cognome");
-        }
-        if (!payslipData.employee.dateOfBirth || payslipData.employee.dateOfBirth.trim() === "") {
-            missingFields.push("Data di Nascita");
-        }
-        
-        if (missingFields.length > 0) {
-            throw new Error(
-                `⚠️ DATI ANAGRAFICI MANCANTI NELLA BUSTA PAGA\n\n` +
-                `Non è stato possibile estrarre i seguenti dati dalla busta paga:\n` +
-                `${missingFields.map(f => `• ${f}`).join('\n')}\n\n` +
-                `Verifica che la busta paga contenga chiaramente tutti i dati anagrafici del dipendente ` +
-                `(Nome, Cognome, Codice Fiscale, Data di Nascita) e riprova con un'immagine più nitida.`
-            );
-        }
-        
+
         return payslipData as Payslip;
     } catch (e) {
-        // Se è il nostro errore di validazione, rilancialo
-        if (e instanceof Error && (e.message.includes("DATI ANAGRAFICI") || e.message.includes("ERRORE:"))) {
-            throw e;
-        }
-        // Altrimenti è un errore di parsing
         console.error("Failed to parse Gemini response as JSON:", jsonStr, e);
         throw new Error("L'analisi ha prodotto un risultato non valido. Assicurati che il file sia una busta paga chiara.");
     }
