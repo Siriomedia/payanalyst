@@ -950,17 +950,30 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const incomeItems: any[] = [];
     const deductionItems: any[] = [];
 
-    // Prima: aggiungo le voci fisse anche tra le competenze (come da tuo schema)
-    for (const el of remunerationElements) {
-        incomeItems.push({
-            description: el.description,
-            quantity: el.quantity,
-            rate: el.rate,
-            value: el.value
-        });
-    }
+    // Helper per classificare voci ambigue per descrizione
+    const isLikelyDeduction = (voce: RawVoceVariabile): boolean => {
+        const d = (voce.description || "").toUpperCase();
 
-    // Poi: corpo centrale
+        // Tutto ciò che contiene queste parole è quasi sicuramente una trattenuta
+        if (d.includes("CONTRIBUTO")) return true;
+        if (d.includes("RITENUTE")) return true;
+        if (d.includes("ADDIZIONALE")) return true;
+        if (d.includes("FIS D.LGS")) return true;
+        if (d.includes("FIS ")) return true;
+        if (d.includes("ACCONTO") && !d.includes("RIMBORSI")) return true;
+        if (d.includes("ARROTOND")) return true;
+
+        // Le voci con "RIMBORSI" sono tipicamente competenze (+)
+        if (d.includes("RIMBORSI")) return false;
+        if (d.includes("RIMBORSO")) return false;
+
+        return false;
+    };
+
+    // NON duplicare le voci fisse in incomeItems!
+    // Le voci fisse (PAGA BASE, SCATTI, ecc.) restano solo in `remunerationElements`
+    // e verranno usate per la sezione "Composizione Retribuzione".
+
     // FILTRO: escludere voci fiscali F02***, F03*** che potrebbero essere sfuggite
     const codiciDaEscludere = ['F02000', 'F02010', 'F02500', 'F02703', 'F03020'];
 
@@ -972,26 +985,33 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
             continue;
         }
 
-        // competenze
         const compVal = parseEuroStringToNumber(voce.competenze);
-        if (compVal !== 0) {
+        const tratVal = parseEuroStringToNumber(voce.trattenute);
+        const desc = voce.description || voce.code || "";
+
+        const deductionByText = isLikelyDeduction(voce);
+
+        // COMPETENZE: importo in colonna competenze, a meno che non sia chiaramente una trattenuta
+        if (compVal !== 0 && !deductionByText) {
             incomeItems.push({
-                description: voce.description || voce.code || "",
+                description: desc,
                 quantity: 0,
                 rate: 0,
                 value: compVal
             });
         }
 
-        // trattenute
-        const tratVal = parseEuroStringToNumber(voce.trattenute);
-        if (tratVal !== 0) {
-            deductionItems.push({
-                description: voce.description || voce.code || "",
-                quantity: 0,
-                rate: 0,
-                value: tratVal
-            });
+        // TRATTENUTE: importo in colonna trattenute, O voce classificata come trattenuta
+        if (tratVal !== 0 || deductionByText) {
+            const value = tratVal !== 0 ? tratVal : compVal; // se l'OCR ha sbagliato colonna, lo riprendiamo come trattenuta
+            if (value !== 0) {
+                deductionItems.push({
+                    description: desc,
+                    quantity: 0,
+                    rate: 0,
+                    value
+                });
+            }
         }
     }
 
@@ -1011,19 +1031,43 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const totalDeductions = deductionsFromRiepilogo || deductionsComputed;
     const netSalary = netFromRiepilogo || netComputed;
 
-    // 2.4. taxData mapping minimale (senza inventare)
+    // 2.4. taxData mapping con validazione (evita valori assurdi)
+    const taxableBase = parseEuroStringToNumber(riepilogo.imponibileFiscale);
+    const grossTax = parseEuroStringToNumber(riepilogo.impostaLorda);
+    const netTax = parseEuroStringToNumber(riepilogo.impostaNetta);
+    const employeeDeductions = parseEuroStringToNumber(riepilogo.detrazioniLavoroDipendente);
+
+    // Validazione: se l'imponibile è più di 4x il lordo del mese, è probabilmente sporco
+    // (potrebbe essere un progressivo annuale interpretato male)
+    const isValidTaxableBase = taxableBase > 0 && taxableBase < (grossSalary * 4);
+    const isValidGrossTax = grossTax >= 0 && grossTax < (grossSalary * 2);
+    const isValidNetTax = netTax >= 0 && netTax < (grossSalary * 2);
+
     const taxData = {
-        taxableBase: parseEuroStringToNumber(riepilogo.imponibileFiscale),
-        grossTax: parseEuroStringToNumber(riepilogo.impostaLorda),
+        taxableBase: isValidTaxableBase ? taxableBase : 0,
+        grossTax: isValidGrossTax ? grossTax : 0,
         deductions: {
-            employee: parseEuroStringToNumber(riepilogo.detrazioniLavoroDipendente),
+            employee: employeeDeductions,
             family: parseEuroStringToNumber(riepilogo.detrazioniFamiliari),
             total: parseEuroStringToNumber(riepilogo.detrazioniTotali)
         },
-        netTax: parseEuroStringToNumber(riepilogo.impostaNetta),
+        netTax: isValidNetTax ? netTax : 0,
         regionalSurtax: parseEuroStringToNumber(riepilogo.addizionaleRegionale),
         municipalSurtax: parseEuroStringToNumber(riepilogo.addizionaleComunale)
     };
+
+    // Log per debug se i dati fiscali sono stati scartati
+    if (!isValidTaxableBase || !isValidGrossTax || !isValidNetTax) {
+        console.warn("⚠️ Dati fiscali parzialmente scartati (valori fuori scala):", {
+            imponibileFiscale: taxableBase,
+            impostaLorda: grossTax,
+            impostaNetta: netTax,
+            grossSalary,
+            isValidTaxableBase,
+            isValidGrossTax,
+            isValidNetTax
+        });
+    }
 
     // 2.5. socialSecurityData
     const socialSecurityData = {
