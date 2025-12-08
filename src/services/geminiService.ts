@@ -574,58 +574,141 @@ const payslipSchema = {
 
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
-    const prompt = `Esegui un'analisi estremamente analitica e approfondita di questa busta paga italiana. ATTENZIONE: La busta paga è divisa in 3 SEZIONI DISTINTE con modalità di lettura diverse:
+    const prompt = `Sei un esperto OCR specializzato in buste paga Zucchetti italiane. Devi estrarre TUTTI i dati con PRECISIONE ASSOLUTA.
 
-**STRUTTURA BUSTA PAGA ZUCCHETTI (3 SEZIONI):**
+📍 STRUTTURA DOCUMENTO (3 SEZIONI VERTICALI):
 
-1️⃣ **SEZIONE ALTA - ANAGRAFICA E DATI BASE** (NON tabellare):
-   - Layout: ETICHETTA sopra, VALORE sotto (90% dei casi)
-   - Cerca verticalmente: l'etichetta è seguita dal valore nella riga sotto
-   - Estrai: Nome, Cognome, Codice Fiscale, Data di Nascita (GG/MM/AAAA), Luogo di Nascita, Livello, CCNL, Qualifica
-   - Estrai anche: Dati Azienda (Ragione Sociale, P.IVA/CF, Indirizzo)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔵 SEZIONE 1: INTESTAZIONE E ANAGRAFICA (layout verticale)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-2️⃣ **SEZIONE CENTRALE - CORPO TABELLARE** (con colonne strutturate):
-   - È una TABELLA con queste COLONNE (da sinistra a destra):
-     • Colonna 1: "Voci variabili del mese" (descrizione della voce)
-     • Colonna 2: "Importo base" (valore base o tariffa oraria)
-     • Colonna 3: "Riferimento" (quantità, ore, giorni)
-     • Colonna 4: "Trattenute" (importi negativi a carico dipendente)
-     • Colonna 5: "Competenze" (importi positivi a favore dipendente)
-   - IMPORTANTE: Leggi RIGA PER RIGA seguendo l'ordine delle colonne
-   - Le voci in questa tabella popolano: remunerationElements, incomeItems, deductionItems
-   - NON confondere le colonne: il valore di una voce può essere in "Competenze" O in "Trattenute", mai in entrambe
+VISUALMENTE: Etichetta scritta sopra, valore stampato sotto nella riga successiva.
 
-3️⃣ **SEZIONE FINALE - RIEPILOGO TASSE E INFO** (NON tabellare):
-   - Layout: ETICHETTA sopra/sinistra, VALORE sotto/destra
-   - Estrai: Imponibili (Fiscale, Previdenziale, TFR), IRPEF (Lorda, Netta, Detrazioni), Addizionali (Regionale, Comunale)
-   - Estrai: Contributi INPS, TFR (Fondo precedente, Quota anno, Fondo totale)
-   - Estrai: Ferie, Permessi, Ex Festività (tutte in ORE con colonne: Precedente, Maturato Anno, Goduto, Residuo)
+ESTRAI CON PRECISIONE:
+• Codice Azienda + Ragione Sociale azienda (es. "FARMACIA MELILLO SAS...")
+• Indirizzo completo azienda (via, città, CAP)
+• Codice Fiscale azienda
+• Posizione INPS + PAT INAIL azienda
+• Codice dipendente + Nome completo dipendente (COGNOME NOME)
+• Codice Fiscale dipendente
+• Data di Nascita (formato GG-MM-AAAA, es. 10-04-1989)
+• Data Assunzione (formato GG-MM-AAAA)
+• Qualifica contrattuale (es. "Farmacista")
+• Livello contrattuale (es. "Livello 1")
+• Tipo contratto part-time/full-time (es. "Part Time 66,25%")
 
-**REGOLE DI LETTURA:**
-- **Sezione 1 e 3**: Analisi semantica, cerca il valore SOTTO o ACCANTO all'etichetta
-- **Sezione 2**: Analisi tabellare rigida, mantieni coerenza tra colonne e righe
-- NON mescolare i dati tra sezioni diverse
-- Verifica che ogni numero estratto appartenga alla voce corretta
+POI TROVA IL RIQUADRO "ELEMENTI DELLA RETRIBUZIONE":
+Qui ci sono LE VOCI FISSE mensili disposte in COLONNE ORIZZONTALI:
+- PAGA BASE: [valore sotto]
+- SCATTI: [valore sotto]
+- CONTING.: [valore sotto]
+- E.D.R.: [valore sotto]
+- IND.FUNZ.: [valore sotto]
+- Altri elementi fissi...
+- TOTALE: [somma elementi]
 
-**DATI OBBLIGATORI (Sezione 1):**
-- Nome, Cognome, Codice Fiscale, Data di Nascita, Luogo di Nascita
-- Se mancanti: indica "NON TROVATO" ma cerca con attenzione
+⚠️ QUESTI VALORI vanno in "remunerationElements" con description (es. "Paga Base") e value.
 
-**FERIE E PERMESSI (Sezione 3):**
-- Valori in ORE (non giorni)
-- "Maturato Anno" = progressivo annuale totale (NON solo mese corrente)
-- Estrai anche "Ex Festività" in exHolidayPermits
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔵 SEZIONE 2: CORPO TABELLA VARIABILI (layout tabellare a 5 colonne)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**TFR (Sezione 3):**
-- Se trovi "Quota anno" o "Accantonamento anno", usa quel valore per \`accrued\`
-- Non inserire 0 se c'è un valore progressivo positivo
+INTESTAZIONI COLONNE (da sinistra a destra):
+┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
+│ VOCI VARIABILI      │ IMPORTO BASE │ RIFERIMENTO  │ TRATTENUTE  │ COMPETENZE   │
+│ DEL MESE            │              │              │             │              │
+└──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
 
-**ACCURATEZZA:**
-- Numeri senza simboli (€, virgole come separatori)
-- 0 solo se il dato è totalmente assente
-- Genera UUID per campo 'id'
+🎯 LEGGI RIGA PER RIGA - OGNI RIGA È UNA VOCE:
 
-Analizza la busta paga rispettando RIGOROSAMENTE queste 3 sezioni e le loro modalità di lettura.`;
+Esempio reale:
+┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
+│ Z00001 Retribuzione │   12,11145   │ 96,61250 ORE │             │   1.170,12   │
+│ Z00250 Ferie godute │   12,11145   │ 18,00000 ORE │             │     218,01   │
+│ 000215 ACCONTO      │              │              │    13,50    │              │
+│ Z00000 Contributo   │   1.388,00   │  9,19000 %   │   127,56    │              │
+│        IVS          │              │              │             │              │
+│ F03020 Ritenute     │              │              │    52,77    │              │
+│        IRPEF        │              │              │             │              │
+└──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
+
+⚠️ REGOLE CRITICHE:
+1. Ogni riga ha UN codice + descrizione nella prima colonna (es. "Z00001 Retribuzione")
+2. IMPORTO BASE e RIFERIMENTO sono valori ausiliari (tariffa oraria, %, ore)
+3. Il valore finale è SEMPRE nella colonna TRATTENUTE oppure COMPETENZE (mai entrambe!)
+4. Se valore in COMPETENZE → è un incomeItem (a favore dipendente)
+5. Se valore in TRATTENUTE → è un deductionItem (a carico dipendente)
+6. NON confondere i valori tra colonne diverse!
+7. Voci con codice che inizia con:
+   - Z00001, Z00250 → Retribuzioni (incomeItems)
+   - 000215, 000320 → Trattenute o voci varie
+   - F02xxx, F03xxx, F09xxx → Voci fiscali (IRPEF, addizionali)
+
+POPOLAMENTO ARRAY:
+• incomeItems: TUTTE le voci con valore in colonna "COMPETENZE"
+• deductionItems: TUTTE le voci con valore in colonna "TRATTENUTE"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔵 SEZIONE 3: RIEPILOGO FINALE (layout misto)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VISIVAMENTE: Tabelle riepilogative con etichette a sinistra/sopra e valori a destra/sotto.
+
+1️⃣ PROGRESSIVI (spesso in una riga orizzontale):
+┌──────────────┬──────────────┬──────────────┬──────────────┐
+│  Imp. INPS   │  Imp. INAIL  │  Imp. IRPEF  │ IRPEF pagata │
+│   15.114,00  │   11.077,00  │   13.685,38  │    741,87    │
+└──────────────┴──────────────┴──────────────┴──────────────┘
+
+2️⃣ TFR (se presente, cerca sezione "TFR" o "T.F.R."):
+- Imponibile TFR mese
+- Fondo al 31/12 anno precedente
+- Quota anno/Accantonamento anno → questo va in "accrued"
+- Fondo totale aggiornato
+
+3️⃣ FERIE, PERMESSI, EX FESTIVITÀ (cerca sezione con colonne):
+TUTTI i valori sono in ORE (non giorni)!
+┌─────────────┬─────────────┬──────────────┬─────────┬──────────┐
+│             │ Precedente  │ Maturato Anno│ Goduto  │ Residuo  │
+│ Ferie       │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
+│ Permessi    │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
+│ Ex Fest.    │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
+└─────────────┴─────────────┴──────────────┴─────────┴──────────┘
+⚠️ "Maturato Anno" = TOTALE progressivo annuale, NON solo mese corrente!
+
+4️⃣ TOTALI FINALI (solitamente in un riquadro in basso a destra):
+┌──────────────────────────┬────────────┐
+│ TOTALE COMPETENZE        │  2.019,44  │
+│ TOTALE TRATTENUTE        │    221,34  │
+│ ARROTONDAMENTO           │      0,90  │
+│ NETTO DEL MESE           │  1.799,00€ │
+└──────────────────────────┴────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ VALIDAZIONE FINALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VERIFICA MATEMATICA:
+✓ grossSalary = somma di TUTTE le voci in colonna COMPETENZE
+✓ totalDeductions = somma di TUTTE le voci in colonna TRATTENUTE
+✓ netSalary ≈ grossSalary - totalDeductions (±1€ per arrotondamenti)
+
+CAMPI OBBLIGATORI DA NON LASCIARE VUOTI:
+✓ Nome e Cognome dipendente (dalla sezione 1)
+✓ Codice Fiscale dipendente (dalla sezione 1)
+✓ Data di Nascita (dalla sezione 1, formato GG-MM-AAAA)
+✓ Luogo di Nascita (se presente nella sezione 1)
+✓ remunerationElements (dal riquadro Elementi Retribuzione in sezione 1)
+✓ incomeItems (da colonna COMPETENZE in sezione 2)
+✓ deductionItems (da colonna TRATTENUTE in sezione 2)
+
+📊 FORMATTAZIONE NUMERI:
+- Converti valori con virgola (1.234,56) → numero decimale (1234.56)
+- Rimuovi simboli €, punti separatori migliaia
+- Usa 0 SOLO se il campo è veramente assente nel documento
+- Genera un UUID per il campo 'id'
+
+🔍 ANALIZZA IL DOCUMENTO CON ATTENZIONE MILLIMETRICA. OGNI NUMERO DEVE CORRISPONDERE ALLA VOCE CORRETTA.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
