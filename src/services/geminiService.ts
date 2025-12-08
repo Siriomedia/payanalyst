@@ -585,17 +585,17 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
 VISUALMENTE: Etichetta scritta sopra, valore stampato sotto nella riga successiva.
 
 ESTRAI CON PRECISIONE:
-• Codice Azienda + Ragione Sociale azienda (es. "FARMACIA MELILLO SAS...")
+• Codice Azienda + Ragione Sociale azienda
 • Indirizzo completo azienda (via, città, CAP)
 • Codice Fiscale azienda
 • Posizione INPS + PAT INAIL azienda
 • Codice dipendente + Nome completo dipendente (COGNOME NOME)
 • Codice Fiscale dipendente
-• Data di Nascita (formato GG-MM-AAAA, es. 10-04-1989)
+• Data di Nascita (formato GG-MM-AAAA)
 • Data Assunzione (formato GG-MM-AAAA)
-• Qualifica contrattuale (es. "Farmacista")
-• Livello contrattuale (es. "Livello 1")
-• Tipo contratto part-time/full-time (es. "Part Time 66,25%")
+• Qualifica contrattuale
+• Livello contrattuale
+• Tipo contratto part-time/full-time (con percentuale)
 
 POI TROVA IL RIQUADRO "ELEMENTI DELLA RETRIBUZIONE":
 Qui ci sono LE VOCI FISSE mensili disposte in COLONNE ORIZZONTALI:
@@ -621,27 +621,22 @@ INTESTAZIONI COLONNE (da sinistra a destra):
 
 🎯 LEGGI RIGA PER RIGA - OGNI RIGA È UNA VOCE:
 
-Esempio reale:
+Struttura tipica:
 ┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
-│ Z00001 Retribuzione │   12,11145   │ 96,61250 ORE │             │   1.170,12   │
-│ Z00250 Ferie godute │   12,11145   │ 18,00000 ORE │             │     218,01   │
-│ 000215 ACCONTO      │              │              │    13,50    │              │
-│ Z00000 Contributo   │   1.388,00   │  9,19000 %   │   127,56    │              │
-│        IVS          │              │              │             │              │
-│ F03020 Ritenute     │              │              │    52,77    │              │
-│        IRPEF        │              │              │             │              │
+│ Codice + Descrizione │  valore base │  ore/% ecc.  │  valore neg │  valore pos  │
+│ (es. Z00001 Voce)    │   opzionale  │  opzionale   │  opzionale  │  opzionale   │
 └──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
 
 ⚠️ REGOLE CRITICHE:
-1. Ogni riga ha UN codice + descrizione nella prima colonna (es. "Z00001 Retribuzione")
+1. Ogni riga ha UN codice + descrizione nella prima colonna
 2. IMPORTO BASE e RIFERIMENTO sono valori ausiliari (tariffa oraria, %, ore)
 3. Il valore finale è SEMPRE nella colonna TRATTENUTE oppure COMPETENZE (mai entrambe!)
 4. Se valore in COMPETENZE → è un incomeItem (a favore dipendente)
 5. Se valore in TRATTENUTE → è un deductionItem (a carico dipendente)
 6. NON confondere i valori tra colonne diverse!
 7. Voci con codice che inizia con:
-   - Z00001, Z00250 → Retribuzioni (incomeItems)
-   - 000215, 000320 → Trattenute o voci varie
+   - Z00xxx → Tipicamente Retribuzioni (incomeItems)
+   - 000xxx → Varie (verifica colonna TRATTENUTE/COMPETENZE)
    - F02xxx, F03xxx, F09xxx → Voci fiscali (IRPEF, addizionali)
 
 POPOLAMENTO ARRAY:
@@ -657,7 +652,7 @@ VISIVAMENTE: Tabelle riepilogative con etichette a sinistra/sopra e valori a des
 1️⃣ PROGRESSIVI (spesso in una riga orizzontale):
 ┌──────────────┬──────────────┬──────────────┬──────────────┐
 │  Imp. INPS   │  Imp. INAIL  │  Imp. IRPEF  │ IRPEF pagata │
-│   15.114,00  │   11.077,00  │   13.685,38  │    741,87    │
+│   [valore]   │   [valore]   │   [valore]   │   [valore]   │
 └──────────────┴──────────────┴──────────────┴──────────────┘
 
 2️⃣ TFR (se presente, cerca sezione "TFR" o "T.F.R."):
@@ -670,18 +665,18 @@ VISIVAMENTE: Tabelle riepilogative con etichette a sinistra/sopra e valori a des
 TUTTI i valori sono in ORE (non giorni)!
 ┌─────────────┬─────────────┬──────────────┬─────────┬──────────┐
 │             │ Precedente  │ Maturato Anno│ Goduto  │ Residuo  │
-│ Ferie       │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
-│ Permessi    │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
-│ Ex Fest.    │   XX,XX     │    YY,YY     │  ZZ,ZZ  │  WW,WW   │
+│ Ferie       │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
+│ Permessi    │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
+│ Ex Fest.    │   [ore]     │    [ore]     │  [ore]  │  [ore]   │
 └─────────────┴─────────────┴──────────────┴─────────┴──────────┘
 ⚠️ "Maturato Anno" = TOTALE progressivo annuale, NON solo mese corrente!
 
 4️⃣ TOTALI FINALI (solitamente in un riquadro in basso a destra):
 ┌──────────────────────────┬────────────┐
-│ TOTALE COMPETENZE        │  2.019,44  │
-│ TOTALE TRATTENUTE        │    221,34  │
-│ ARROTONDAMENTO           │      0,90  │
-│ NETTO DEL MESE           │  1.799,00€ │
+│ TOTALE COMPETENZE        │  [valore]  │
+│ TOTALE TRATTENUTE        │  [valore]  │
+│ ARROTONDAMENTO           │  [valore]  │
+│ NETTO DEL MESE           │  [valore]€ │
 └──────────────────────────┴────────────┘
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
