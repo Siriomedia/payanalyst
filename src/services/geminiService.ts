@@ -621,11 +621,32 @@ INTESTAZIONI COLONNE (da sinistra a destra):
 
 🎯 LEGGI RIGA PER RIGA - OGNI RIGA È UNA VOCE:
 
+⚠️⚠️⚠️ REGOLA FONDAMENTALE PER EVITARE ERRORI:
+OGNI VALORE NUMERICO APPARTIENE **SOLO ED ESCLUSIVAMENTE** ALLA RIGA IN CUI SI TROVA!
+NON associare MAI un valore a una riga diversa da quella in cui è stampato.
+
 Struttura tipica:
 ┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
 │ Codice + Descrizione │  valore base │  ore/% ecc.  │  valore neg │  valore pos  │
 │ (es. Z00001 Voce)    │   opzionale  │  opzionale   │  opzionale  │  opzionale   │
 └──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
+
+ESEMPIO DI LETTURA CORRETTA:
+Se vedi:
+┌────────────────────────────┬──────┬──────────┬─────────────┬──────────────┐
+│ F00880 Rimborsi da 730     │ 2024 │          │             │              │
+│ F02000 Imponibile IRPEF    │      │ 1.256,86 │             │              │
+│ F02010 IRPEF lorda         │      │   289,08 │             │              │
+│ F02500 Detrazioni lav.dip. │      │   244,19 │             │              │
+│ F02703 Indennità L.207/24  │      │          │             │        60,32 │
+└────────────────────────────┴──────┴──────────┴─────────────┴──────────────┘
+
+ESTRAZIONE CORRETTA:
+- "Rimborsi da 730": nessun valore (non include valori dalle righe sotto!)
+- "Imponibile IRPEF": 1.256,86 (informativo, non va in incomeItems/deductionItems)
+- "IRPEF lorda": 289,08 (informativo)
+- "Detrazioni lav.dip.": 244,19 (informativo)
+- "Indennità L.207/24": 60,32 in colonna COMPETENZE → incomeItem con value: 60.32
 
 ⚠️ REGOLE CRITICHE:
 1. Ogni riga ha UN codice + descrizione nella prima colonna
@@ -633,15 +654,19 @@ Struttura tipica:
 3. Il valore finale è SEMPRE nella colonna TRATTENUTE oppure COMPETENZE (mai entrambe!)
 4. Se valore in COMPETENZE → è un incomeItem (a favore dipendente)
 5. Se valore in TRATTENUTE → è un deductionItem (a carico dipendente)
-6. NON confondere i valori tra colonne diverse!
+6. ⚠️⚠️⚠️ CRUCIALE: NON confondere MAI i valori tra righe diverse!
+   - Se "F00880 Rimborsi da 730" NON ha un valore nella sua riga, NON estrarre quella voce
+   - Se "F02703 Indennità L.207/24" ha 60,32 nella sua riga, usa QUEL valore per QUELLA voce
 7. Voci con codice che inizia con:
    - Z00xxx → Tipicamente Retribuzioni (incomeItems)
    - 000xxx → Varie (verifica colonna TRATTENUTE/COMPETENZE)
-   - F02xxx, F03xxx, F09xxx → Voci fiscali (IRPEF, addizionali)
+   - F02xxx, F03xxx, F09xxx → Voci fiscali (IRPEF, addizionali, detrazioni)
+   - F00xxx → Voci informative o conguagli
 
 POPOLAMENTO ARRAY:
 • incomeItems: TUTTE le voci con valore in colonna "COMPETENZE"
 • deductionItems: TUTTE le voci con valore in colonna "TRATTENUTE"
+• NON includere voci senza valori nelle colonne finali
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔵 SEZIONE 3: RIEPILOGO FINALE (layout misto)
