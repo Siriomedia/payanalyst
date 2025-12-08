@@ -806,44 +806,95 @@ Se un importo non è chiaramente leggibile, usa una stringa vuota "".
 # VOCI VARIABILI (CORPO CENTRALE)
 ########################
 Inizia dalla tabella "VOCI VARIABILI DEL MESE".
-Per OGNI riga della tabella principale:
 
-- code: eventuale codice voce (es. "Z00001", "F00880"). Se non presente, usa stringa vuota.
-- description: descrizione completa della voce (es. "Rimborsi da 730").
+IMPORTANTE: ESCLUDI completamente dalle vociVariabili le seguenti righe:
+- F02000 Imponibile IRPEF
+- F02010 IRPEF lorda
+- F02500 Detrazioni lav.dip.
+- F03020 Ritenute IRPEF
+- F02703 Indennità L.207/24
+- Qualsiasi altra voce F02*** o F03*** che contiene dati fiscali
+
+Queste voci NON vanno in vociVariabili, ma solo in riepilogo (verranno estratte dopo).
+
+Per TUTTE LE ALTRE righe della tabella:
+
+- code: eventuale codice voce (es. "Z00001", "F00880", "F09110"). Se non presente, usa stringa vuota.
+- description: descrizione completa della voce (es. "Rimborsi da 730", "Addizionale regionale").
 - trattenute: importo nella colonna TRATTENUTE (penultima colonna a destra). Se vuota, metti "".
 - competenze: importo nella colonna COMPETENZE (ultima colonna a destra). Se vuota, metti "".
 
-IGNORA completamente:
-- importi in colonne centrali (Base, Ore, Giorni, Residuo, Aliquota, ecc.).
+REGOLE SPECIALI PER CASI DIFFICILI:
 
-Esempi:
-- "Z00001 Retribuzione":
-  - trattenute = "" (di solito vuota)
-  - competenze = importo grosso a destra (es. "1.170,12").
-- "F00880 Rimborsi da 730":
-  - competenze = importo nella sua colonna COMPETENZE (stessa riga).
-- "F02703 Indennità L.207/24":
-  - trattala come riga propria, con i suoi importi.
+1) F00880 Rimborsi da 730:
+   - Se sulla riga vedi "Residuo 327,00" (o simile), usa 327,00 come COMPETENZA.
+   - Questo è un'ECCEZIONE: normalmente ignori "Residuo", ma per il 730 è l'importo corretto.
+
+2) F09110/F09130/F09140 (Addizionali IRPEF):
+   - Queste righe hanno SEMPRE due numeri: "Residuo XX,XX" e l'importo del mese.
+   - Esempi:
+     - "F09110 Addizionale regionale 2024 CAMPANIA Residuo 77,39 38,69"
+       → trattenute = "38,69" (NON 77,39)
+     - "F09130 Addizionale comunale 2024 CASORIA 13,78"
+       → trattenute = "13,78"
+     - "F09140 Acconto addiz. comunale 2025 CASORIA Residuo 10,99 5,50"
+       → trattenute = "5,50" (NON 10,99)
+   - Regola: prendi l'ULTIMO numero sulla riga, NON quello dopo "Residuo".
+
+3) Z00001 Retribuzione:
+   - Il valore piccolo tipo "12,11145" è la paga oraria → IGNORALO.
+   - Il valore grosso (es. "1.170,12") è la competenza → PRENDILO.
+
+4) Tutte le altre voci (Z00***, straordinari, ecc.):
+   - trattenute = penultima colonna a destra
+   - competenze = ultima colonna a destra
 
 NON spostare mai un importo da una riga all'altra.
+NON mescolare i numeri tra righe diverse.
 
 ########################
 # RIEPILOGO
 ########################
 Nella parte bassa del documento (piede), estrai:
 
+TOTALI (OBBLIGATORI):
 - stipendioLordo: "Stipendio lordo" o "Totale competenze".
 - totaleTrattenute: "Totale trattenute".
 - nettoMese: "Netto del mese" / "Netto in busta".
 
-Se presenti, leggi anche:
-- Imponibile fiscale, Imposta lorda, Detrazioni, Imposta netta, Addizionali.
-- Imponibile previdenziale, contributi dipendente/azienda, INAIL.
-- Dati TFR (imponibile, quota, fondo precedente, fondo totale).
-- Ferie e ROL (saldo precedente, maturato, goduto, saldo residuo).
+DATI FISCALI (dal piede, NON dalla tabella centrale):
+Cerca la sezione "RIEPILOGO FISCALE" o simile nel piede del documento:
+- imponibileFiscale: valore accanto a "Imponibile fiscale" o "F02000 Imponibile IRPEF"
+- impostaLorda: valore accanto a "Imposta lorda" o "F02010 IRPEF lorda"
+- detrazioniLavoroDipendente: valore accanto a "Detrazioni lav.dip." o "F02500"
+- impostaNetta: valore accanto a "Imposta netta" o "F03020 Ritenute IRPEF"
+- addizionaleRegionale: valore accanto a "Addizionale regionale" (progressivo totale)
+- addizionaleComunale: valore accanto a "Addizionale comunale" (progressivo totale)
+
+DATI PREVIDENZIALI:
+- imponibilePrevidenziale: "Imponibile previdenziale"
+- contributiDipendente: "Contributi dipendente"
+- contributiAzienda: "Contributi azienda"
+- contributoInail: "INAIL"
+
+DATI TFR:
+- imponibileTfr: "Imponibile TFR"
+- quotaTfr: "Quota maturata" o "Accantonamento"
+- fondoTfrPrecedente: "Fondo precedente"
+- fondoTfrTotale: "Fondo totale"
+
+FERIE E ROL:
+IMPORTANTE: Compila questi campi SOLO se trovi una tabella esplicita di "RATEI" o "FERIE E PERMESSI" con colonne:
+- Saldo precedente / Maturato / Goduto / Saldo residuo
+
+Se NON trovi questa tabella, lascia TUTTI i campi ferie/ROL vuoti ("").
+NON derivare ore dalle voci variabili "Ferie godute" o "ROL goduti".
+
+Se trovi la tabella:
+- ferieSaldoPrecedente, ferieMaturate, ferieGodute, ferieSaldoResiduo
+- rolSaldoPrecedente, rolMaturati, rolGoduti, rolSaldoResiduo
 
 Riporta gli importi esattamente come li leggi (es. "1.588,45").
-
 NON fare calcoli, NON verificare coerenza: il tuo unico compito è leggere e riportare.
 
 Rispondi SOLO con JSON valido che rispetti lo schema fornito (rawPayslipSchema).
@@ -910,7 +961,17 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     }
 
     // Poi: corpo centrale
+    // FILTRO: escludere voci fiscali F02***, F03*** che potrebbero essere sfuggite
+    const codiciDaEscludere = ['F02000', 'F02010', 'F02500', 'F02703', 'F03020'];
+
     for (const voce of raw.vociVariabili || []) {
+        // Salta voci fiscali che non dovrebbero essere qui
+        const codice = voce.code?.toUpperCase() || "";
+        if (codiciDaEscludere.some(c => codice.includes(c))) {
+            console.log(`Voce fiscale ${codice} esclusa dalle voci variabili (corretto)`);
+            continue;
+        }
+
         // competenze
         const compVal = parseEuroStringToNumber(voce.competenze);
         if (compVal !== 0) {
@@ -981,18 +1042,24 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     };
 
     // 2.7. Ferie & permessi
+    // Solo se ci sono dati reali (non usare valori dalle voci variabili)
+    const hasVacationData = riepilogo.ferieSaldoPrecedente || riepilogo.ferieMaturate ||
+                           riepilogo.ferieGodute || riepilogo.ferieSaldoResiduo;
+    const hasPermitsData = riepilogo.rolSaldoPrecedente || riepilogo.rolMaturati ||
+                          riepilogo.rolGoduti || riepilogo.rolSaldoResiduo;
+
     const leaveData = {
         vacation: {
-            previous: parseEuroStringToNumber(riepilogo.ferieSaldoPrecedente),
-            accrued: parseEuroStringToNumber(riepilogo.ferieMaturate),
-            taken: parseEuroStringToNumber(riepilogo.ferieGodute),
-            balance: parseEuroStringToNumber(riepilogo.ferieSaldoResiduo)
+            previous: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieSaldoPrecedente) : 0,
+            accrued: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieMaturate) : 0,
+            taken: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieGodute) : 0,
+            balance: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieSaldoResiduo) : 0
         },
         permits: {
-            previous: parseEuroStringToNumber(riepilogo.rolSaldoPrecedente),
-            accrued: parseEuroStringToNumber(riepilogo.rolMaturati),
-            taken: parseEuroStringToNumber(riepilogo.rolGoduti),
-            balance: parseEuroStringToNumber(riepilogo.rolSaldoResiduo)
+            previous: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolSaldoPrecedente) : 0,
+            accrued: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolMaturati) : 0,
+            taken: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolGoduti) : 0,
+            balance: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolSaldoResiduo) : 0
         }
     };
 
@@ -1035,20 +1102,27 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const diffDed = Math.abs(deductionsComputed - totalDeductions);
 
     if (diffNetFromRiepilogo > 1.5 || diffGross > 5 || diffDed > 5) {
-        console.error("Incongruenza dati busta paga:", {
-            grossSalary,
-            totalDeductions,
-            netSalary,
-            grossComputed,
-            deductionsComputed,
-            netComputed,
-            diffNetFromRiepilogo,
-            diffGross,
-            diffDed,
-            raw
-        });
+        console.error("⚠️ Incongruenza dati busta paga rilevata:");
+        console.error("Totali di riepilogo:", { grossSalary, totalDeductions, netSalary });
+        console.error("Totali calcolati:", { grossComputed, deductionsComputed, netComputed });
+        console.error("Differenze:", { diffGross, diffDed, diffNetFromRiepilogo });
+        console.error("Voci variabili estratte:", raw.vociVariabili);
+        console.error("Riepilogo completo:", raw.riepilogo);
+
+        // Log dettagliato delle competenze e trattenute
+        console.error("Competenze (incomeItems):", incomeItems);
+        console.error("Trattenute (deductionItems):", deductionItems);
+
         // Se vuoi essere ancora più rigido, lancia direttamente:
         // throw new Error("Busta paga incoerente: i totali non tornano. Rileggere il documento.");
+    } else {
+        console.log("✓ Busta paga validata con successo:", {
+            lordo: grossSalary,
+            trattenute: totalDeductions,
+            netto: netSalary,
+            mese: raw.header.month,
+            anno: raw.header.year
+        });
     }
 
     return payslip;
