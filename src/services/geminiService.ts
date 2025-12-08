@@ -927,249 +927,157 @@ Rispondi SOLO con JSON valido che rispetti lo schema fornito (rawPayslipSchema).
 };
 
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
-    // STEP 1: estrazione grezza
-    const raw = await extractRawPayslip(file);
+    const imagePart = await fileToGenerativePart(file);
 
-    // Helper per nome completo
-    const firstName = raw.header.employeeFirstName || "";
-    const lastName = raw.header.employeeLastName || "";
-    const dateOfBirth = raw.header.employeeDateOfBirth || "";
-    const placeOfBirth = raw.header.employeePlaceOfBirth || "";
+    const prompt = `
+Sei un sistema OCR specializzato in buste paga italiane formato "Zucchetti".
+Devi compilare lo schema JSON fornito con la MASSIMA precisione possibile.
+Non inventare dati: se un campo non è presente, usa 0 per i numeri e stringa vuota per i testi.
 
-    // STEP 2: mapping deterministico → payslipSchema
+────────────────────────────────────
+1) STRUTTURA LOGICA DEL DOCUMENTO
+────────────────────────────────────
+Il cedolino è diviso in 3 zone:
 
-    // 2.1. Remuneration elements (ZONA 1)
-    const remunerationElements = (raw.header.remunerationElements || []).map(el => ({
-        description: el.label,
-        quantity: 0,
-        rate: 0,
-        value: parseEuroStringToNumber(el.value)
-    }));
+• ZONA 1 – "ELEMENTI DELLA RETRIBUZIONE" (parte alta, box con PAGA BASE, SCATTI, CONTING., E.D.R., IND.FUNZ., TOTALE retribuzione mensile lorda)
+  - Regola visiva: ETICHETTA SOPRA → VALORE SOTTO.
+  - Esempio: riga con "PAGA BASE", sotto "1.429,19".
+  - Queste voci vanno SOLO in "remunerationElements".
+  - NON vanno sommate di nuovo nelle competenze del mese.
 
-    // 2.2. Voci variabili (ZONA 2) → incomeItems / deductionItems
-    const incomeItems: any[] = [];
-    const deductionItems: any[] = [];
+• ZONA 2 – TABELLA "VOCI VARIABILI DEL MESE" (corpo centrale)
+  - Colonne essenziali da sinistra a destra:
+    [Codice/Descrizione] … [colonne centrali: base, ore, riferimenti] … [TRATTENUTE] [COMPETENZE]
+  - Devi leggere riga per riga in ORIZZONTALE.
+  - IGNORA SEMPRE le colonne centrali (base, imponibile, residuo, ore, giorni, aliquote).
+  - Usa SOLO le ultime due colonne a destra:
+    • penultima: importi di TRATTENUTE (a carico del dipendente)
+    • ultima: importi di COMPETENZE (a favore del dipendente)
 
-    // Helper per classificare voci ambigue per descrizione
-    const isLikelyDeduction = (voce: RawVoceVariabile): boolean => {
-        const d = (voce.description || "").toUpperCase();
+• ZONA 3 – RIEPILOGHI FINALI (parti basse: TOTALE COMPETENZE, TOTALE TRATTENUTE, NETTO DEL MESE, Dati Fiscali, TFR, Ferie/Permessi)
+  - Qui leggi i totali esposti e le tabelle riepilogative.
+  - "TOTALE COMPETENZE", "TOTALE TRATTENUTE", "NETTO DEL MESE" sono i valori di riferimento principali.
 
-        // Tutto ciò che contiene queste parole è quasi sicuramente una trattenuta
-        if (d.includes("CONTRIBUTO")) return true;
-        if (d.includes("RITENUTE")) return true;
-        if (d.includes("ADDIZIONALE")) return true;
-        if (d.includes("FIS D.LGS")) return true;
-        if (d.includes("FIS ")) return true;
-        if (d.includes("ACCONTO") && !d.includes("RIMBORSI")) return true;
-        if (d.includes("ARROTOND")) return true;
+────────────────────────────────────
+2) REMUNERATIONELEMENTS (VOCI FISSE)
+────────────────────────────────────
+• Individua la sezione "ELEMENTI DELLA RETRIBUZIONE" o simile.
+• Inserisci in "remunerationElements" una voce per ciascun elemento fisso:
+  - descrizione: es. "Paga Base", "Scatti", "Contingenza", "E.D.R.", "Indennità di funzione".
+  - value: valore letto SOTTO l'etichetta.
+• NON inserire queste voci in "incomeItems". Rimangono SOLO come composizione della retribuzione teorica.
 
-        // Le voci con "RIMBORSI" sono tipicamente competenze (+)
-        if (d.includes("RIMBORSI")) return false;
-        if (d.includes("RIMBORSO")) return false;
+────────────────────────────────────
+3) INCOMEITEMS E DEDUCTIONITEMS (SOLO IMPORTI DEL MESE)
+────────────────────────────────────
+Lavora sulla tabella "VOCI VARIABILI DEL MESE" (ZONA 2):
 
-        return false;
-    };
+Per OGNI riga della tabella:
+  1. Leggi Codice + Descrizione (prima colonna).
+  2. Ignora COMPLETAMENTE le colonne centrali (base, ore, impor. fiscale, residuo, ecc.).
+  3. Se nella colonna COMPETENZE (ultima a destra) c'è un importo > 0:
+     → crea un elemento in "incomeItems" con quella descrizione e quel valore.
+  4. Se nella colonna TRATTENUTE (penultima) c'è un importo > 0:
+     → crea un elemento in "deductionItems" con quella descrizione e quel valore.
 
-    // NON duplicare le voci fisse in incomeItems!
-    // Le voci fisse (PAGA BASE, SCATTI, ecc.) restano solo in `remunerationElements`
-    // e verranno usate per la sezione "Composizione Retribuzione".
+Regole semantiche AGGIUNTIVE (correzioni tipiche Zucchetti):
+  • Voci tipicamente COMPETENZE, se hanno importo:
+    - "Retribuzione" (Z00001)
+    - "Ferie godute" (Z00250)
+    - "rimborsi spese no tfr" (006738)
+    - "Indennità L.207/24" (F02703) → competenza
+  • Voci tipicamente TRATTENUTE, se hanno importo:
+    - qualsiasi cosa con "Contributo" (IVS, Ebifarm, ecc.)
+    - "FIS D.Lgs.148/2015..."
+    - "Ritenute IRPEF"
+    - "Addizionale regionale"
+    - "Addizionale comunale"
+    - "Acconto addiz. comunale"
+    - "ACCONTO"
+    - "Arrotond. mese pr."
 
-    // FILTRO: escludere voci fiscali F02***, F03*** che potrebbero essere sfuggite
-    const codiciDaEscludere = ['F02000', 'F02010', 'F02500', 'F02703', 'F03020'];
+Se l'OCR posiziona erroneamente una di queste voci in COMPETENZE ma dal testo è chiaramente una trattenuta (contiene "Contributo", "Addizionale", "Ritenute", "FIS", "ACCONTO" non di rimborso):
+  → considerala come "deductionItem" (trattenuta) e NON come competenza.
 
-    for (const voce of raw.vociVariabili || []) {
-        // Salta voci fiscali che non dovrebbero essere qui
-        const codice = voce.code?.toUpperCase() || "";
-        if (codiciDaEscludere.some(c => codice.includes(c))) {
-            console.log(`Voce fiscale ${codice} esclusa dalle voci variabili (corretto)`);
-            continue;
+────────────────────────────────────
+4) GESTIONE SPECIFICA "RIMBORSI DA 730"
+────────────────────────────────────
+Codice F00880 "Rimborsi da 730":
+
+• Se sulla riga di F00880 vedi SOLO un importo marcato come "Residuo" o chiaramente progressivo (es. "Residuo 327,00") e NON c'è un importo distinto in colonna COMPETENZE/TRATTENUTE:
+  → NON creare né incomeItem né deductionItem per F00880 (per il mese l'importo è 0).
+• Inserisci eventualmente queste informazioni nel contesto fiscale se servono, ma NON devono alterare i totali del mese.
+
+────────────────────────────────────
+5) DATI FISCALI, PREVIDENZIALI, TFR, FERIE
+────────────────────────────────────
+• "taxData": leggi i valori SOLO dai riquadri riepilogativi in basso (ZONA 3), NON dalla tabella centrale:
+  - Imponibile Fiscale, Imposta Lorda, Detrazioni Lavoro Dipendente, Detrazioni Totali, Imposta Netta, Addizionali.
+• "socialSecurityData": usa i box riepilogativi per Imponibile INPS e contributi; se non c'è un quadro dedicato, puoi usare la somma delle voci contributive delle trattenute.
+• "tfr" e "leaveData": leggi le apposite tabelle (Imponibile TFR, Quota maturata, Fondo precedente/totale, Ferie/ROL con saldo precedente, maturato, goduto, saldo).
+
+────────────────────────────────────
+6) COERENZA MATEMATICA
+────────────────────────────────────
+• Calcola:
+  - grossSalary = somma di TUTTI i valori in "incomeItems".
+  - totalDeductions = somma di TUTTI i valori in "deductionItems".
+  - netSalaryCalcolato = grossSalary - totalDeductions.
+
+• Leggi dalla busta (ZONA 3) se presenti:
+  - "TOTALE COMPETENZE"
+  - "TOTALE TRATTENUTE"
+  - "NETTO DEL MESE"
+
+• Se i totali stampati sono presenti:
+  - imposta grossSalary uguale a "TOTALE COMPETENZE".
+  - imposta totalDeductions uguale a "TOTALE TRATTENUTE".
+  - imposta netSalary uguale a "NETTO DEL MESE".
+  Anche se la somma degli item differisce di qualche centesimo, i valori di riferimento sono quelli stampati sul cedolino.
+
+• Se i totali non sono chiaramente leggibili:
+  - usa i valori calcolati (grossSalary, totalDeductions, netSalaryCalcolato).
+
+────────────────────────────────────
+7) VINCOLI DI OUTPUT
+────────────────────────────────────
+• Rispondi SOLO con JSON valido che rispetti esattamente lo schema fornito (payslipSchema).
+• Usa numeri in formato standard (es. "1.588,45" → 1588.45).
+• Se un campo richiesto non è presente sul documento, usa:
+  - 0 per i numeri,
+  - "" per le stringhe.
+• "incomeItems" e "deductionItems" devono contenere SOLO voci che concorrono ai totali di competenze e trattenute del mese, senza elementi fissi duplicati e senza rimborsi 730 "figurativi" (residui).
+`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+            { text: prompt },
+            imagePart
+        ],
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: payslipSchema,
+            // massima "rigidità" possibile
+            temperature: 0.0,
+            topP: 0.1,
+            topK: 1
+        }
+    });
+
+    const jsonStr = response.text.trim();
+    try {
+        const payslipData = JSON.parse(jsonStr);
+
+        if (!payslipData.id) {
+            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
         }
 
-        const compVal = parseEuroStringToNumber(voce.competenze);
-        const tratVal = parseEuroStringToNumber(voce.trattenute);
-        const desc = voce.description || voce.code || "";
-
-        const deductionByText = isLikelyDeduction(voce);
-
-        // COMPETENZE: importo in colonna competenze, a meno che non sia chiaramente una trattenuta
-        if (compVal !== 0 && !deductionByText) {
-            incomeItems.push({
-                description: desc,
-                quantity: 0,
-                rate: 0,
-                value: compVal
-            });
-        }
-
-        // TRATTENUTE: importo in colonna trattenute, O voce classificata come trattenuta
-        if (tratVal !== 0 || deductionByText) {
-            const value = tratVal !== 0 ? tratVal : compVal; // se l'OCR ha sbagliato colonna, lo riprendiamo come trattenuta
-            if (value !== 0) {
-                deductionItems.push({
-                    description: desc,
-                    quantity: 0,
-                    rate: 0,
-                    value
-                });
-            }
-        }
+        return payslipData as Payslip;
+    } catch (e) {
+        console.error("Failed to parse Gemini response as JSON:", jsonStr, e);
+        throw new Error("L'analisi ha prodotto un risultato non valido. Assicurati che il file sia una busta paga chiara.");
     }
-
-    // 2.3. Riepilogo numerico (ZONA 3)
-    const riepilogo = raw.riepilogo || ({} as RawRiepilogo);
-
-    const grossFromRiepilogo = parseEuroStringToNumber(riepilogo.stipendioLordo);
-    const deductionsFromRiepilogo = parseEuroStringToNumber(riepilogo.totaleTrattenute);
-    const netFromRiepilogo = parseEuroStringToNumber(riepilogo.nettoMese);
-
-    const grossComputed = incomeItems.reduce((sum, i) => sum + (i.value || 0), 0);
-    const deductionsComputed = deductionItems.reduce((sum, d) => sum + (d.value || 0), 0);
-    const netComputed = grossComputed - deductionsComputed;
-
-    // Scelgo come valore "ufficiale" quelli di riepilogo, ma tengo i calcolati per controlli
-    const grossSalary = grossFromRiepilogo || grossComputed;
-    const totalDeductions = deductionsFromRiepilogo || deductionsComputed;
-    const netSalary = netFromRiepilogo || netComputed;
-
-    // 2.4. taxData mapping con validazione (evita valori assurdi)
-    const taxableBase = parseEuroStringToNumber(riepilogo.imponibileFiscale);
-    const grossTax = parseEuroStringToNumber(riepilogo.impostaLorda);
-    const netTax = parseEuroStringToNumber(riepilogo.impostaNetta);
-    const employeeDeductions = parseEuroStringToNumber(riepilogo.detrazioniLavoroDipendente);
-
-    // Validazione: se l'imponibile è più di 4x il lordo del mese, è probabilmente sporco
-    // (potrebbe essere un progressivo annuale interpretato male)
-    const isValidTaxableBase = taxableBase > 0 && taxableBase < (grossSalary * 4);
-    const isValidGrossTax = grossTax >= 0 && grossTax < (grossSalary * 2);
-    const isValidNetTax = netTax >= 0 && netTax < (grossSalary * 2);
-
-    const taxData = {
-        taxableBase: isValidTaxableBase ? taxableBase : 0,
-        grossTax: isValidGrossTax ? grossTax : 0,
-        deductions: {
-            employee: employeeDeductions,
-            family: parseEuroStringToNumber(riepilogo.detrazioniFamiliari),
-            total: parseEuroStringToNumber(riepilogo.detrazioniTotali)
-        },
-        netTax: isValidNetTax ? netTax : 0,
-        regionalSurtax: parseEuroStringToNumber(riepilogo.addizionaleRegionale),
-        municipalSurtax: parseEuroStringToNumber(riepilogo.addizionaleComunale)
-    };
-
-    // Log per debug se i dati fiscali sono stati scartati
-    if (!isValidTaxableBase || !isValidGrossTax || !isValidNetTax) {
-        console.warn("⚠️ Dati fiscali parzialmente scartati (valori fuori scala):", {
-            imponibileFiscale: taxableBase,
-            impostaLorda: grossTax,
-            impostaNetta: netTax,
-            grossSalary,
-            isValidTaxableBase,
-            isValidGrossTax,
-            isValidNetTax
-        });
-    }
-
-    // 2.5. socialSecurityData
-    const socialSecurityData = {
-        taxableBase: parseEuroStringToNumber(riepilogo.imponibilePrevidenziale),
-        employeeContribution: parseEuroStringToNumber(riepilogo.contributiDipendente),
-        companyContribution: parseEuroStringToNumber(riepilogo.contributiAzienda),
-        inailContribution: parseEuroStringToNumber(riepilogo.contributoInail)
-    };
-
-    // 2.6. TFR
-    const tfr = {
-        taxableBase: parseEuroStringToNumber(riepilogo.imponibileTfr),
-        accrued: parseEuroStringToNumber(riepilogo.quotaTfr),
-        previousBalance: parseEuroStringToNumber(riepilogo.fondoTfrPrecedente),
-        totalFund: parseEuroStringToNumber(riepilogo.fondoTfrTotale)
-    };
-
-    // 2.7. Ferie & permessi
-    // Solo se ci sono dati reali (non usare valori dalle voci variabili)
-    const hasVacationData = riepilogo.ferieSaldoPrecedente || riepilogo.ferieMaturate ||
-                           riepilogo.ferieGodute || riepilogo.ferieSaldoResiduo;
-    const hasPermitsData = riepilogo.rolSaldoPrecedente || riepilogo.rolMaturati ||
-                          riepilogo.rolGoduti || riepilogo.rolSaldoResiduo;
-
-    const leaveData = {
-        vacation: {
-            previous: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieSaldoPrecedente) : 0,
-            accrued: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieMaturate) : 0,
-            taken: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieGodute) : 0,
-            balance: hasVacationData ? parseEuroStringToNumber(riepilogo.ferieSaldoResiduo) : 0
-        },
-        permits: {
-            previous: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolSaldoPrecedente) : 0,
-            accrued: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolMaturati) : 0,
-            taken: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolGoduti) : 0,
-            balance: hasPermitsData ? parseEuroStringToNumber(riepilogo.rolSaldoResiduo) : 0
-        }
-    };
-
-    // 2.8. Costruzione finale del Payslip secondo payslipSchema
-    const payslip: Payslip = {
-        id: `payslip-${Date.now()}-${Math.random()}`,
-        period: {
-            month: raw.header.month,
-            year: raw.header.year
-        },
-        company: {
-            name: raw.header.companyName,
-            taxId: raw.header.companyTaxId,
-            address: raw.header.companyAddress
-        },
-        employee: {
-            firstName,
-            lastName,
-            taxId: raw.header.employeeTaxId,
-            dateOfBirth,
-            placeOfBirth,
-            level: raw.header.level || "",
-            contractType: raw.header.contractType || ""
-        },
-        remunerationElements,
-        incomeItems,
-        deductionItems,
-        grossSalary,
-        totalDeductions,
-        netSalary,
-        taxData,
-        socialSecurityData,
-        tfr,
-        leaveData
-    };
-
-    // STEP 3 – controlli di coerenza forti (bloccanti o almeno log)
-    const diffNetFromRiepilogo = Math.abs((grossSalary - totalDeductions) - netSalary);
-    const diffGross = Math.abs(grossComputed - grossSalary);
-    const diffDed = Math.abs(deductionsComputed - totalDeductions);
-
-    if (diffNetFromRiepilogo > 1.5 || diffGross > 5 || diffDed > 5) {
-        console.error("⚠️ Incongruenza dati busta paga rilevata:");
-        console.error("Totali di riepilogo:", { grossSalary, totalDeductions, netSalary });
-        console.error("Totali calcolati:", { grossComputed, deductionsComputed, netComputed });
-        console.error("Differenze:", { diffGross, diffDed, diffNetFromRiepilogo });
-        console.error("Voci variabili estratte:", raw.vociVariabili);
-        console.error("Riepilogo completo:", raw.riepilogo);
-
-        // Log dettagliato delle competenze e trattenute
-        console.error("Competenze (incomeItems):", incomeItems);
-        console.error("Trattenute (deductionItems):", deductionItems);
-
-        // Se vuoi essere ancora più rigido, lancia direttamente:
-        // throw new Error("Busta paga incoerente: i totali non tornano. Rileggere il documento.");
-    } else {
-        console.log("✓ Busta paga validata con successo:", {
-            lordo: grossSalary,
-            trattenute: totalDeductions,
-            netto: netSalary,
-            mese: raw.header.month,
-            anno: raw.header.year
-        });
-    }
-
-    return payslip;
 };
 
 export const getComparisonAnalysis = async (p1: Payslip, p2: Payslip): Promise<string> => {
