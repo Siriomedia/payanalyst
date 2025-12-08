@@ -11,6 +11,7 @@ export enum View {
     LeavePlanner = 'leave_planner',
     AdminPanel = 'admin_panel',
     Subscription = 'subscription',
+    PayrollReference = 'payroll_reference',
 }
 
 export interface User {

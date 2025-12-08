@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, User } from './types.ts';
-import { HomeIcon, UploadIcon, ArchiveIcon, CompareIcon, AssistantIcon, SettingsIcon, ShiftIcon, LeaveIcon, AdminIcon, SubscriptionIcon } from './components/common/Icons.tsx';
+import { HomeIcon, UploadIcon, ArchiveIcon, CompareIcon, AssistantIcon, SettingsIcon, ShiftIcon, LeaveIcon, AdminIcon, SubscriptionIcon, DatabaseIcon } from './components/common/Icons.tsx';
 
 const baseItems = [
     { id: View.Dashboard, label: 'Dashboard', icon: <HomeIcon /> },
@@ -8,6 +8,7 @@ const baseItems = [
     { id: View.Archive, label: 'Archivio', icon: <ArchiveIcon /> },
     { id: View.Compare, label: 'Confronta', icon: <CompareIcon /> },
     { id: View.Assistant, label: 'Assistente AI', icon: <AssistantIcon /> },
+    { id: View.PayrollReference, label: 'Database Riferimento', icon: <DatabaseIcon /> },
     { id: View.ShiftPlanner, label: 'Pianifica Turni', icon: <ShiftIcon /> },
     { id: View.LeavePlanner, label: 'Pianifica Ferie/ROL', icon: <LeaveIcon /> },
 ];

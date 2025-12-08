@@ -13,6 +13,7 @@ import AdminPanel from './components/AdminPanel.tsx';
 import Subscription from './components/Subscription.tsx';
 import UpgradeModal from './components/UpgradeModal.tsx';
 import ProfileOnboarding from './components/ProfileOnboarding.tsx';
+import PayrollReference from './components/PayrollReference.tsx';
 
 import { View, Payslip, User, Shift, LeavePlan, Absence, Plan } from './types.ts';
 import { PLANS, CREDIT_COSTS } from './config/plans.ts';
@@ -658,6 +659,8 @@ const App: React.FC = () => {
                                 const userRef = doc(db, "users", auth.currentUser.uid);
                                 await setDoc(userRef, updatedData, { merge: true });
                             }} onPasswordChange={() => Promise.resolve()} />;
+                        case View.PayrollReference:
+                            return <PayrollReference />;
                         default:
                             return null;
                     }
