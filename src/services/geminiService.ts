@@ -610,63 +610,71 @@ Qui ci sono LE VOCI FISSE mensili disposte in COLONNE ORIZZONTALI:
 ⚠️ QUESTI VALORI vanno in "remunerationElements" con description (es. "Paga Base") e value.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔵 SEZIONE 2: CORPO TABELLA VARIABILI (layout tabellare a 5 colonne)
+🔵 SEZIONE 2: TABELLA VOCI VARIABILI - LETTURA TABELLARE RIGA PER RIGA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-INTESTAZIONI COLONNE (da sinistra a destra):
+INTESTAZIONE TABELLA (da sinistra a destra):
 ┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
-│ VOCI VARIABILI      │ IMPORTO BASE │ RIFERIMENTO  │ TRATTENUTE  │ COMPETENZE   │
-│ DEL MESE            │              │              │             │              │
+│ VOCI VARIABILI      │ (colonne     │  intermedie  │ TRATTENUTE  │ COMPETENZE   │
+│ DEL MESE            │  varie)      │  ignora)     │             │              │
 └──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
 
-🎯 LEGGI RIGA PER RIGA - OGNI RIGA È UNA VOCE:
+🎯 METODO DI LETTURA TABELLARE SEMPLICE:
 
-⚠️⚠️⚠️ REGOLA FONDAMENTALE PER EVITARE ERRORI:
-OGNI VALORE NUMERICO APPARTIENE **SOLO ED ESCLUSIVAMENTE** ALLA RIGA IN CUI SI TROVA!
-NON associare MAI un valore a una riga diversa da quella in cui è stampato.
+LEGGI LA TABELLA COME UN FOGLIO EXCEL, RIGA PER RIGA:
 
-Struttura tipica:
-┌──────────────────────┬──────────────┬──────────────┬─────────────┬──────────────┐
-│ Codice + Descrizione │  valore base │  ore/% ecc.  │  valore neg │  valore pos  │
-│ (es. Z00001 Voce)    │   opzionale  │  opzionale   │  opzionale  │  opzionale   │
-└──────────────────────┴──────────────┴──────────────┴─────────────┴──────────────┘
+Per OGNI RIGA della tabella:
+1️⃣ Prima colonna → nome della voce (es. "F00880 Rimborsi da 730")
+2️⃣ GUARDA SOLO SULLA STESSA RIGA nelle ultime due colonne a destra:
+   - Valore nella colonna "TRATTENUTE"? → deductionItem
+   - Valore nella colonna "COMPETENZE"? → incomeItem
+3️⃣ IGNORA tutte le colonne intermedie (IMPORTO BASE, RIFERIMENTO, anno, ecc.)
+4️⃣ Se la riga NON ha valori in TRATTENUTE né in COMPETENZE → SALTA quella voce
 
-ESEMPIO DI LETTURA CORRETTA:
-Se vedi:
+⚠️⚠️⚠️ REGOLA FONDAMENTALE:
+Ogni valore appartiene SOLO alla riga in cui si trova.
+NON prendere MAI un valore da una riga e assegnarlo a una voce di un'altra riga.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 ESEMPIO PRATICO DI LETTURA CORRETTA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Documento mostra questa tabella:
 ┌────────────────────────────┬──────┬──────────┬─────────────┬──────────────┐
-│ F00880 Rimborsi da 730     │ 2024 │          │             │              │
-│ F02000 Imponibile IRPEF    │      │ 1.256,86 │             │              │
-│ F02010 IRPEF lorda         │      │   289,08 │             │              │
-│ F02500 Detrazioni lav.dip. │      │   244,19 │             │              │
-│ F02703 Indennità L.207/24  │      │          │             │        60,32 │
+│ F00880 Rimborsi da 730     │ 2024 │          │             │       60,32  │ ← Riga 1
+│ F02000 Imponibile IRPEF    │      │ 1.256,86 │             │              │ ← Riga 2
+│ F02010 IRPEF lorda         │      │          │     289,08  │              │ ← Riga 3
+│ F02500 Detrazioni lav.dip. │      │   244,19 │             │              │ ← Riga 4
+│ F02703 Indennità L.207/24  │      │          │             │      327,00  │ ← Riga 5
 └────────────────────────────┴──────┴──────────┴─────────────┴──────────────┘
+       ↑                        ↑        ↑            ↑              ↑
+   NOME VOCE              (ignora) (ignora)    TRATTENUTE      COMPETENZE
 
 ESTRAZIONE CORRETTA:
-- "Rimborsi da 730": nessun valore (non include valori dalle righe sotto!)
-- "Imponibile IRPEF": 1.256,86 (informativo, non va in incomeItems/deductionItems)
-- "IRPEF lorda": 289,08 (informativo)
-- "Detrazioni lav.dip.": 244,19 (informativo)
-- "Indennità L.207/24": 60,32 in colonna COMPETENZE → incomeItem con value: 60.32
+✅ Riga 1: "Rimborsi da 730" → 60,32 nella colonna COMPETENZE
+   → incomeItem: { code: "F00880", description: "Rimborsi da 730", value: 60.32 }
 
-⚠️ REGOLE CRITICHE:
-1. Ogni riga ha UN codice + descrizione nella prima colonna
-2. IMPORTO BASE e RIFERIMENTO sono valori ausiliari (tariffa oraria, %, ore)
-3. Il valore finale è SEMPRE nella colonna TRATTENUTE oppure COMPETENZE (mai entrambe!)
-4. Se valore in COMPETENZE → è un incomeItem (a favore dipendente)
-5. Se valore in TRATTENUTE → è un deductionItem (a carico dipendente)
-6. ⚠️⚠️⚠️ CRUCIALE: NON confondere MAI i valori tra righe diverse!
-   - Se "F00880 Rimborsi da 730" NON ha un valore nella sua riga, NON estrarre quella voce
-   - Se "F02703 Indennità L.207/24" ha 60,32 nella sua riga, usa QUEL valore per QUELLA voce
-7. Voci con codice che inizia con:
-   - Z00xxx → Tipicamente Retribuzioni (incomeItems)
-   - 000xxx → Varie (verifica colonna TRATTENUTE/COMPETENZE)
-   - F02xxx, F03xxx, F09xxx → Voci fiscali (IRPEF, addizionali, detrazioni)
-   - F00xxx → Voci informative o conguagli
+✅ Riga 2: "Imponibile IRPEF" → nessun valore in TRATTENUTE/COMPETENZE → SALTA
 
-POPOLAMENTO ARRAY:
-• incomeItems: TUTTE le voci con valore in colonna "COMPETENZE"
-• deductionItems: TUTTE le voci con valore in colonna "TRATTENUTE"
-• NON includere voci senza valori nelle colonne finali
+✅ Riga 3: "IRPEF lorda" → 289,08 nella colonna TRATTENUTE
+   → deductionItem: { code: "F02010", description: "IRPEF lorda", value: 289.08 }
+
+✅ Riga 4: "Detrazioni lav.dip." → nessun valore in TRATTENUTE/COMPETENZE → SALTA
+
+✅ Riga 5: "Indennità L.207/24" → 327,00 nella colonna COMPETENZE
+   → incomeItem: { code: "F02703", description: "Indennità L.207/24", value: 327.00 }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ ERRORI DA EVITARE:
+• NON usare i valori delle colonne intermedie (1.256,86, 244,19) come valori finali
+• NON prendere 60,32 dalla Riga 1 e metterlo in Riga 5
+• NON confondere i valori tra righe diverse
+
+✅ COSA FARE:
+• Guarda SOLO le ultime due colonne (TRATTENUTE e COMPETENZE)
+• Ogni voce prende il valore che si trova sulla sua stessa riga
+• Se una riga non ha valori nelle colonne finali, ignora quella voce
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔵 SEZIONE 3: RIEPILOGO FINALE (layout misto)
