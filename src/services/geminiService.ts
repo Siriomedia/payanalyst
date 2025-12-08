@@ -574,16 +574,58 @@ const payslipSchema = {
 
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
-    const prompt = `Esegui un'analisi estremamente analitica e approfondita di questa busta paga italiana. Non tralasciare alcun dettaglio. Interpreta ogni singola voce, numero e codice, anche se posizionata in modo non standard. Popola lo schema JSON fornito con la massima precisione e granularità.
-- **Dati Anagrafici e Contrattuali - OBBLIGATORI**: Devi SEMPRE estrarre Nome, Cognome, Codice Fiscale, Data di Nascita e Luogo di Nascita del dipendente. Questi dati si trovano nella sezione "Dati Anagrafici" o "Dati Dipendente" della busta paga. Cerca attentamente nel documento: la Data di Nascita è spesso in formato GG/MM/AAAA e il Luogo di Nascita è il nome del comune. NON usare stringhe vuote per questi campi - se non li trovi, indica chiaramente "NON TROVATO" ma cerca sempre con attenzione. Estrai anche livello, CCNL, qualifica e dati aziendali.
-- **Elementi della Retribuzione**: Identifica la sezione 'Elementi della Retribuzione' (o simile) e popola l'array \`remunerationElements\` con ogni singola voce che contribuisce alla retribuzione mensile lorda (es. Paga Base, Contingenza, Scatti Anzianità, Superminimo, E.D.R.). È fondamentale che questa sezione sia completa.
-- **Corpo della Busta Paga**: Popola \`incomeItems\` con TUTTE le competenze a favore del dipendente (incluse quelle di base già elencate in \`remunerationElements\`) e \`deductionItems\` con tutte le trattenute.
-- **TFR (IMPORTANTE)**: Per la sezione TFR, estrai il valore della "Quota maturata". Se la busta paga riporta solo la "Quota anno" (o progressivo annuo), utilizza quel valore per il campo \`accrued\`. Non inserire 0 se è presente un valore positivo nella colonna della quota/accantonamento TFR.
-- **FERIE, PERMESSI E EX FESTIVITÀ (IMPORTANTE)**: I valori di ferie, permessi (ROL) e permessi ex festività sono espressi in ORE, non in giorni. Il campo "maturato" (accrued) rappresenta il TOTALE maturato da inizio anno (progressivo annuale), NON il maturato del singolo mese. Estrai anche i "Permessi Ex Festività" (o "Ex Fest", "Festività Abolite") nel campo \`exHolidayPermits\`.
-- **Dati Fiscali e Previdenziali**: Dettaglia con precisione tutte le sezioni relative a IRPEF e contributi INPS.
-- **Accuratezza Numerica**: Assicurati che tutti i campi numerici siano correttamente parsati come numeri. Non inserire il simbolo dell'euro o altri caratteri non numerici. Usa 0 solo se il dato è totalmente assente.
-- **Completezza per campi opzionali**: Solo per campi NON obbligatori, se un dato non è esplicitamente presente, usa 0 per i valori numerici e stringhe vuote per il testo.
-- **ID Univoco**: Genera un UUID per il campo 'id'.`;
+    const prompt = `Esegui un'analisi estremamente analitica e approfondita di questa busta paga italiana. ATTENZIONE: La busta paga è divisa in 3 SEZIONI DISTINTE con modalità di lettura diverse:
+
+**STRUTTURA BUSTA PAGA ZUCCHETTI (3 SEZIONI):**
+
+1️⃣ **SEZIONE ALTA - ANAGRAFICA E DATI BASE** (NON tabellare):
+   - Layout: ETICHETTA sopra, VALORE sotto (90% dei casi)
+   - Cerca verticalmente: l'etichetta è seguita dal valore nella riga sotto
+   - Estrai: Nome, Cognome, Codice Fiscale, Data di Nascita (GG/MM/AAAA), Luogo di Nascita, Livello, CCNL, Qualifica
+   - Estrai anche: Dati Azienda (Ragione Sociale, P.IVA/CF, Indirizzo)
+
+2️⃣ **SEZIONE CENTRALE - CORPO TABELLARE** (con colonne strutturate):
+   - È una TABELLA con queste COLONNE (da sinistra a destra):
+     • Colonna 1: "Voci variabili del mese" (descrizione della voce)
+     • Colonna 2: "Importo base" (valore base o tariffa oraria)
+     • Colonna 3: "Riferimento" (quantità, ore, giorni)
+     • Colonna 4: "Trattenute" (importi negativi a carico dipendente)
+     • Colonna 5: "Competenze" (importi positivi a favore dipendente)
+   - IMPORTANTE: Leggi RIGA PER RIGA seguendo l'ordine delle colonne
+   - Le voci in questa tabella popolano: remunerationElements, incomeItems, deductionItems
+   - NON confondere le colonne: il valore di una voce può essere in "Competenze" O in "Trattenute", mai in entrambe
+
+3️⃣ **SEZIONE FINALE - RIEPILOGO TASSE E INFO** (NON tabellare):
+   - Layout: ETICHETTA sopra/sinistra, VALORE sotto/destra
+   - Estrai: Imponibili (Fiscale, Previdenziale, TFR), IRPEF (Lorda, Netta, Detrazioni), Addizionali (Regionale, Comunale)
+   - Estrai: Contributi INPS, TFR (Fondo precedente, Quota anno, Fondo totale)
+   - Estrai: Ferie, Permessi, Ex Festività (tutte in ORE con colonne: Precedente, Maturato Anno, Goduto, Residuo)
+
+**REGOLE DI LETTURA:**
+- **Sezione 1 e 3**: Analisi semantica, cerca il valore SOTTO o ACCANTO all'etichetta
+- **Sezione 2**: Analisi tabellare rigida, mantieni coerenza tra colonne e righe
+- NON mescolare i dati tra sezioni diverse
+- Verifica che ogni numero estratto appartenga alla voce corretta
+
+**DATI OBBLIGATORI (Sezione 1):**
+- Nome, Cognome, Codice Fiscale, Data di Nascita, Luogo di Nascita
+- Se mancanti: indica "NON TROVATO" ma cerca con attenzione
+
+**FERIE E PERMESSI (Sezione 3):**
+- Valori in ORE (non giorni)
+- "Maturato Anno" = progressivo annuale totale (NON solo mese corrente)
+- Estrai anche "Ex Festività" in exHolidayPermits
+
+**TFR (Sezione 3):**
+- Se trovi "Quota anno" o "Accantonamento anno", usa quel valore per \`accrued\`
+- Non inserire 0 se c'è un valore progressivo positivo
+
+**ACCURATEZZA:**
+- Numeri senza simboli (€, virgole come separatori)
+- 0 solo se il dato è totalmente assente
+- Genera UUID per campo 'id'
+
+Analizza la busta paga rispettando RIGOROSAMENTE queste 3 sezioni e le loro modalità di lettura.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
