@@ -575,68 +575,117 @@ const payslipSchema = {
 export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
 
-    // DEFINIZIONE STRATEGICA DEL PROMPT PER BUSTE PAGA ZUCCHETTI
-    // Corregge specificamente:
-    // 1. Lettura verticale degli elementi fissi (Paga Base)
-    // 2. Lettura tabellare delle voci variabili (evitando confusione con Residui/Basi)
-    // 3. Lettura corretta di Rimborsi 730 e Addizionali
     const prompt = `
 Sei un sistema OCR avanzato specializzato ESCLUSIVAMENTE nella lettura di buste paga italiane formato "Zucchetti".
-Il tuo compito è estrarre i dati in formato JSON con precisione chirurgica.
-NON INVENTARE DATI. Se un campo è vuoto o illeggibile, restituisci 0 o stringa vuota.
+Il tuo compito è leggere il documento e compilare il JSON secondo lo schema fornito.
+NON INVENTARE DATI: se una voce non è presente o non è leggibile, usa 0 per i numeri e stringa vuota per i testi.
 
-⚠️ ISTRUZIONI CRITICHE DI LETTURA VISIVA - SEGUIRE RIGOROSAMENTE ⚠️
-Il documento è diviso in 3 zone con LOGICHE DI LETTURA OPPOSTE. Devi cambiare strategia mentre scendi nel foglio.
+############################################
+# REGOLA DI BASE
+############################################
+1) Prima LEGGI l'intera busta paga con calma.
+2) POI compila il JSON.
+3) Prima di restituire il JSON, CONTROLLA che:
+   - somma(competenze) ≈ STIPENDIO LORDO / TOTALE COMPETENZE
+   - somma(trattenute) ≈ TOTALE TRATTENUTE
+   - STIPENDIO LORDO - TOTALE TRATTENUTE ≈ NETTO DEL MESE
 
---- ZONA 1: TESTATA E ELEMENTI FISSI (Lettura VERTICALE) ---
-Cerca la sezione "ELEMENTI DELLA RETRIBUZIONE".
-Qui la logica è: **ETICHETTA SOPRA -> VALORE SOTTO**.
-Esempio:
-[PAGA BASE]   [CONTING.]
-[1.429,19 ]   [ 530,45 ]
-NON leggere il valore a fianco dell'etichetta. Leggi quello nella riga immediatamente sotto.
-Popola l'array "remunerationElements" con questi valori.
+Se i numeri non tornano, NON correggere inventando importi:
+rileggi con attenzione l'importo visibile accanto alla voce nella busta.
 
---- ZONA 2: CORPO CENTRALE "VOCI VARIABILI" (Lettura TABELLARE ORIZZONTALE) ---
-Questa è la parte più critica. Inizia sotto l'intestazione "VOCI VARIABILI DEL MESE".
-Struttura colonne: [Codice/Voce] ... [Importo Base] [Riferimento] ... [TRATTENUTE] [COMPETENZE]
+############################################
+# ZONA 1 – TESTATA E ELEMENTI FISSI (LETTURA VERTICALE)
+############################################
+Cerca la sezione "ELEMENTI DELLA RETRIBUZIONE" (o simile).
+Qui la logica è: ETICHETTA SOPRA → VALORE SOTTO.
 
-REGOLE PER OGNI RIGA DEL CORPO:
-1. **Identifica la riga**: Leggi il Codice (es. Z00001, F00880) e la Descrizione a sinistra.
-2. **Ignora il centro**: SALTA completamente le colonne centrali che contengono "Ore", "Giorni", "Base", "Aliq.", "Residuo". Spesso contengono numeri che NON sono l'importo (es. 12,11145 è la paga oraria, NON lo stipendio).
-3. **Punta a destra**: Cerca i valori SOLO nelle ultime due colonne a destra della pagina.
-   - **Colonna Penultima (TRATTENUTE)**: Valori negativi o trattenute (es. Contributi, Addizionali, Acconti). Inserisci in "deductionItems".
-   - **Colonna Ultima (COMPETENZE)**: Valori positivi (es. Retribuzione, Straordinari, Rimborsi). Inserisci in "incomeItems".
+Esempio visivo:
+[PAGA BASE]   [SCATTI]   [CONTING.]   [E.D.R.]   [IND.FUNZ.]
+[1429,19 ]    [ 25,31 ]  [ 530,45 ]   [ 10,33 ]  [ 100,00 ]
 
-CASI SPECIFICI DA GESTIRE CORRETTAMENTE (Esempi comuni Zucchetti):
-- **F00880 Rimborsi da 730**: È una COMPETENZA (colonna estrema destra). NON confonderlo con i valori di voci vicine (es. F02703).
-- **F02703 Indennità L.207/24**: Spesso appare vicino alle detrazioni ma è una COMPETENZA o una DETRAZIONE specifica. Verifica la colonna.
-- **Addizionali (Regionale/Comunale)**: Sono TRATTENUTE (penultima colonna). Ignora i valori "Residuo" o "Acconto" scritti nelle colonne centrali. Prendi solo l'importo effettivamente trattenuto a destra.
-- **Z00001 Retribuzione**: Il valore grande (es. 1.170,12) è a destra (Competenze). Il valore piccolo (es. 12,11) al centro è solo la tariffa oraria: IGNORALO.
+Regole:
+- NON leggere valori sulla stessa riga dell'etichetta.
+- Usa SOLO i valori sulla riga SOTTOSTANTE, allineati in verticale.
+- Ogni coppia ETICHETTA + VALORE produce un elemento di "remunerationElements".
 
---- ZONA 3: PIEDE, TFR E FERIE (Lettura Mista) ---
-1. **TFR**: Cerca la tabella in basso. Colonne tipiche: "Fondo 31/12", "Rivalutaz.", "Quota anno". Se l'OCR testuale è vuoto ma l'immagine contiene dati, sforzati di leggere i numeri nella griglia.
-2. **Ferie/Permessi**: Cerca la tabella "Rate". Colonne: Residuo AP, Maturato, Goduto, Saldo.
-3. **Totali Finali**: "TOTALE COMPETENZE", "TOTALE TRATTENUTE", "NETTO DEL MESE". Spesso seguono la logica verticale (Etichetta sopra, Valore sotto) o sono in box separati in fondo.
+############################################
+# ZONA 2 – CORPO "VOCI VARIABILI DEL MESE" (LETTURA TABELLARE ORIZZONTALE)
+############################################
+Questa sezione è una tabella.
+Colonne tipiche (da sinistra a destra):
+[Codice + Descrizione] ... [Importo Base] [Riferimento] ... [TRATTENUTE] [COMPETENZE]
 
---- FORMATO JSON RICHIESTO ---
-Rispondi SOLO con il JSON valido che rispetta lo schema seguente.
-Schema dati:
-- remunerationElements: Voci fisse (Paga base, ecc. dalla ZONA 1).
-- incomeItems: Voci positive variabili (dalla colonna COMPETENZE della ZONA 2) + le voci fisse.
-- deductionItems: Voci negative (dalla colonna TRATTENUTE della ZONA 2).
-- taxData: Dettaglio IRPEF. "F02010 IRPEF Lorda", "F02500 Detrazioni", "F09110 Addizionale Reg.", "F09130 Addizionale Com.".
-- socialSecurityData: Imponibile INPS e Contributi (cerca "Contributo IVS" o Z00000).
-- tfr: Sezione TFR.
-- leaveData: Sezione Ferie e Permessi.
+Per OGNI riga DELLA TABELLA:
+1) Leggi il codice voce (es. Z00001, F00880, F02703, ecc.) e la descrizione.
+2) IGNORA le colonne centrali:
+   - "Ore" / "Giorni"
+   - "Base"
+   - "Aliquota"
+   - "Residuo"
+   - qualsiasi numero che non sia nelle DUE COLONNE PIÙ A DESTRA.
+3) Considera SOLO le ultime due colonne:
+   - Penultima colonna = TRATTENUTE → vai in "deductionItems".
+   - Ultima colonna   = COMPETENZE → vai in "incomeItems".
 
-REGOLE DI VALIDAZIONE MATEMATICA:
-- incomeItems (somma) - deductionItems (somma) deve essere circa uguale al "netSalary".
-- Converti tutti i numeri in formato Javascript (es. "1.200,50" -> 1200.50).
+IMPORTANTE:
+- Non spostare mai un importo da una riga all'altra.
+- Un importo appartiene SEMPRE alla voce che è sulla STESSA RIGA.
+
+CASI PARTICOLARI (tipici Zucchetti):
+- Z00001 Retribuzione:
+  - Il valore centrale piccolo (es. 12,11145) è la paga oraria → IGNORALO.
+  - Il valore valido è quello nella colonna COMPETENZE (ultima a destra, es. 1170,12).
+- F00880 Rimborsi da 730:
+  - È una COMPETENZA → prendi l'importo SOLO dalla colonna COMPETENZE della SUA riga.
+  - NON prendere importi dalle righe sopra o sotto (es. F02703).
+- F02703 Indennità L.207/24:
+  - Tratta questa voce come una riga separata.
+  - Il suo importo è quello nella SUA colonna di TRATTENUTE o COMPETENZE (sulla sua riga).
+- Addizionali IRPEF:
+  - F09110 Addizionale regionale
+  - F09130 Addizionale comunale
+  - F09140 Acconto addiz. comunale
+  Queste sono TRATTENUTE: prendi il valore dalla penultima colonna (TRATTENUTE).
+  Ignora "residuo", "acconto", ecc. nelle colonne centrali: non sono gli importi del mese.
+
+############################################
+# ZONA 3 – PIEDE, TFR E FERIE (LETTURA MISTA)
+############################################
+1) TFR:
+   - Cerca la sezione con diciture tipo "Imponibile TFR", "Quota maturata", "Fondo precedente", "Fondo totale".
+   - Se non trovi valori chiari, imposta tutti i campi numerici TFR a 0.
+
+2) Ferie e permessi:
+   - Usa la tabella con "Saldo precedente", "Maturato", "Goduto", "Saldo residuo".
+   - Se mancano valori, imposta 0.
+
+3) Totali:
+   - Stipendio Lordo (o Totale Competenze)
+   - Totale Trattenute
+   - Netto del Mese / Netto a pagare
+   Questi sono i VALORI DI RIFERIMENTO per validare i tuoi calcoli.
+
+############################################
+# COMPILAZIONE DELLO SCHEMA
+############################################
+Compila lo schema JSON così:
+- remunerationElements: dalle voci fisse della ZONA 1.
+- incomeItems: tutte le voci con importo COMPETENZE (ZONA 1 + ZONA 2).
+- deductionItems: tutte le voci con importo TRATTENUTE (ZONA 2).
+- grossSalary: usa il "Totale Competenze / Stipendio Lordo" stampato in busta.
+- totalDeductions: usa il "Totale trattenute" stampato in busta.
+- netSalary: deve essere IDENTICO al "Netto del mese / Netto in busta".
+- taxData: compila solo se vedi chiaramente le voci fiscali; altrimenti metti 0 dove non leggibile.
+- socialSecurityData: stessa cosa per INPS/INAIL.
+- tfr e leaveData: se non hai i dati, imposta i numeri a 0 invece di inventare.
+
+Ricorda:
+- I numeri devono essere in formato 1234.56 (virgola decimale → punto, separatori migliaia rimossi).
+- Se non sei sicuro di un importo, meglio 0 che un numero inventato.
 `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: "gemini-2.5-flash",
         contents: [
             { text: prompt },
             imagePart
@@ -644,17 +693,30 @@ REGOLE DI VALIDAZIONE MATEMATICA:
         config: {
             responseMimeType: "application/json",
             responseSchema: payslipSchema,
-            temperature: 0.0 // ZERO creatività per massimizzare la precisione OCR
+            temperature: 0.0,
+            topP: 0.1,
+            topK: 1
         }
     });
 
     const jsonStr = response.text.trim();
+
     try {
         const payslipData = JSON.parse(jsonStr);
 
-        // Fallback ID generation
         if (!payslipData.id) {
-           payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
+            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
+        }
+
+        // Controllo rapido di coerenza (puoi raffinarlo):
+        const gross = Number(payslipData.grossSalary || 0);
+        const ded = Number(payslipData.totalDeductions || 0);
+        const net = Number(payslipData.netSalary || 0);
+        const diff = Math.abs((gross - ded) - net);
+
+        if (gross > 0 && ded >= 0 && net > 0 && diff > 1.5) {
+            console.error("Incongruenza tra lordo, trattenute e netto:", { gross, ded, net, diff });
+            // Qui puoi anche lanciare errore invece di tornare dati incoerenti
         }
 
         return payslipData as Payslip;
