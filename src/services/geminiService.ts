@@ -576,52 +576,63 @@ export const analyzePayslip = async (file: File): Promise<Payslip> => {
     const imagePart = await fileToGenerativePart(file);
 
     // DEFINIZIONE STRATEGICA DEL PROMPT PER BUSTE PAGA ZUCCHETTI
+    // Corregge specificamente:
+    // 1. Lettura verticale degli elementi fissi (Paga Base)
+    // 2. Lettura tabellare delle voci variabili (evitando confusione con Residui/Basi)
+    // 3. Lettura corretta di Rimborsi 730 e Addizionali
     const prompt = `
 Sei un sistema OCR avanzato specializzato ESCLUSIVAMENTE nella lettura di buste paga italiane formato "Zucchetti".
 Il tuo compito è estrarre i dati in formato JSON con precisione chirurgica.
 NON INVENTARE DATI. Se un campo è vuoto o illeggibile, restituisci 0 o stringa vuota.
 
-⚠️ ISTRUZIONI CRITICHE DI LETTURA VISIVA (SEGUIRE ALLA LETTERA) ⚠️
-Il documento è diviso in 3 zone con REGOLE DI LETTURA DIVERSE. Devi cambiare strategia di lettura mentre scendi nel documento.
+⚠️ ISTRUZIONI CRITICHE DI LETTURA VISIVA - SEGUIRE RIGOROSAMENTE ⚠️
+Il documento è diviso in 3 zone con LOGICHE DI LETTURA OPPOSTE. Devi cambiare strategia mentre scendi nel foglio.
 
---- ZONA 1: INTESTAZIONE E ELEMENTI FISSI (Lettura VERTICALE) ---
-In questa sezione (che include "PAGA BASE", "SCATTI", "CONTINGENZA", "E.D.R.", "TOTALE"), i valori NON sono accanto alle etichette, ma SOTTO.
-1. Cerca l'etichetta (es. "PAGA BASE").
-2. Il valore numerico corrispondente si trova nella RIGA SOTTOSTANTE, allineato verticalmente.
-   Esempio VISIVO:
-   [PAGA BASE]  [CONTING.]
-   [1.429,19 ]  [ 530,45 ]
--> Estrai questi valori per popolare l'array "remunerationElements".
+--- ZONA 1: TESTATA E ELEMENTI FISSI (Lettura VERTICALE) ---
+Cerca la sezione "ELEMENTI DELLA RETRIBUZIONE".
+Qui la logica è: **ETICHETTA SOPRA -> VALORE SOTTO**.
+Esempio:
+[PAGA BASE]   [CONTING.]
+[1.429,19 ]   [ 530,45 ]
+NON leggere il valore a fianco dell'etichetta. Leggi quello nella riga immediatamente sotto.
+Popola l'array "remunerationElements" con questi valori.
 
---- ZONA 2: CORPO CENTRALE "VOCI VARIABILI" (Lettura ORIZZONTALE TABELLARE) ---
-Questa sezione inizia con l'intestazione "VOCI VARIABILI DEL MESE". Qui vige una rigorosa logica TABELLARE.
-Le colonne sono (da sinistra a destra): [Voce] [Importo Base] [Riferimento] [TRATTENUTE] [COMPETENZE].
-PER OGNI RIGA:
-1. Leggi la descrizione della voce a sinistra.
-2. Scorri verso destra SULLA STESSA RIGA ESATTA.
-3. IGNORA le colonne "Importo Base" e "Riferimento" (colonne centrali).
-4. Cerca valori solo nelle ultime due colonne a destra:
-   - Penultima colonna = TRATTENUTE (Metti in "deductionItems").
-   - Ultima colonna = COMPETENZE (Metti in "incomeItems").
-5. IMPORTANTE: Se una voce (es. "Rimborsi da 730") ha un valore, questo sarà molto a destra. Non confonderlo con i valori delle colonne centrali.
+--- ZONA 2: CORPO CENTRALE "VOCI VARIABILI" (Lettura TABELLARE ORIZZONTALE) ---
+Questa è la parte più critica. Inizia sotto l'intestazione "VOCI VARIABILI DEL MESE".
+Struttura colonne: [Codice/Voce] ... [Importo Base] [Riferimento] ... [TRATTENUTE] [COMPETENZE]
 
---- ZONA 3: PIEDE E TFR (Lettura Mista) ---
-1. Sezione TFR: è una tabella orizzontale (Fondo 31/12, Rivalutazione, Quota Anno).
-2. Totali finali (es. "TOTALE COMPETENZE", "NETTO DEL MESE"): Spesso seguono la logica verticale (Etichetta sopra, Valore sotto) o sono in caselle ben distinte.
-3. Sezione Ferie/Permessi: Tabella orizzontale (Residuo AP, Maturato, Goduto, Saldo).
+REGOLE PER OGNI RIGA DEL CORPO:
+1. **Identifica la riga**: Leggi il Codice (es. Z00001, F00880) e la Descrizione a sinistra.
+2. **Ignora il centro**: SALTA completamente le colonne centrali che contengono "Ore", "Giorni", "Base", "Aliq.", "Residuo". Spesso contengono numeri che NON sono l'importo (es. 12,11145 è la paga oraria, NON lo stipendio).
+3. **Punta a destra**: Cerca i valori SOLO nelle ultime due colonne a destra della pagina.
+   - **Colonna Penultima (TRATTENUTE)**: Valori negativi o trattenute (es. Contributi, Addizionali, Acconti). Inserisci in "deductionItems".
+   - **Colonna Ultima (COMPETENZE)**: Valori positivi (es. Retribuzione, Straordinari, Rimborsi). Inserisci in "incomeItems".
+
+CASI SPECIFICI DA GESTIRE CORRETTAMENTE (Esempi comuni Zucchetti):
+- **F00880 Rimborsi da 730**: È una COMPETENZA (colonna estrema destra). NON confonderlo con i valori di voci vicine (es. F02703).
+- **F02703 Indennità L.207/24**: Spesso appare vicino alle detrazioni ma è una COMPETENZA o una DETRAZIONE specifica. Verifica la colonna.
+- **Addizionali (Regionale/Comunale)**: Sono TRATTENUTE (penultima colonna). Ignora i valori "Residuo" o "Acconto" scritti nelle colonne centrali. Prendi solo l'importo effettivamente trattenuto a destra.
+- **Z00001 Retribuzione**: Il valore grande (es. 1.170,12) è a destra (Competenze). Il valore piccolo (es. 12,11) al centro è solo la tariffa oraria: IGNORALO.
+
+--- ZONA 3: PIEDE, TFR E FERIE (Lettura Mista) ---
+1. **TFR**: Cerca la tabella in basso. Colonne tipiche: "Fondo 31/12", "Rivalutaz.", "Quota anno". Se l'OCR testuale è vuoto ma l'immagine contiene dati, sforzati di leggere i numeri nella griglia.
+2. **Ferie/Permessi**: Cerca la tabella "Rate". Colonne: Residuo AP, Maturato, Goduto, Saldo.
+3. **Totali Finali**: "TOTALE COMPETENZE", "TOTALE TRATTENUTE", "NETTO DEL MESE". Spesso seguono la logica verticale (Etichetta sopra, Valore sotto) o sono in box separati in fondo.
 
 --- FORMATO JSON RICHIESTO ---
 Rispondi SOLO con il JSON valido che rispetta lo schema seguente.
 Schema dati:
-- remunerationElements: Voci fisse (Paga base, ecc. prese dalla ZONA 1).
-- incomeItems: Voci positive variabili (prese dalla colonna COMPETENZE della ZONA 2) + le voci fisse.
-- deductionItems: Voci negative (prese dalla colonna TRATTENUTE della ZONA 2, es. Contributi, Trattenute Sindacali, Addizionali).
-- taxData: Dettaglio IRPEF (Imponibile, Imposta Lorda, Detrazioni, Netta). Cerca le voci che iniziano con "F..." nel corpo o nel riepilogo fiscale.
-- socialSecurityData: Imponibile INPS e Contributi (cerca voce "Contributo IVS" o totali in basso).
+- remunerationElements: Voci fisse (Paga base, ecc. dalla ZONA 1).
+- incomeItems: Voci positive variabili (dalla colonna COMPETENZE della ZONA 2) + le voci fisse.
+- deductionItems: Voci negative (dalla colonna TRATTENUTE della ZONA 2).
+- taxData: Dettaglio IRPEF. "F02010 IRPEF Lorda", "F02500 Detrazioni", "F09110 Addizionale Reg.", "F09130 Addizionale Com.".
+- socialSecurityData: Imponibile INPS e Contributi (cerca "Contributo IVS" o Z00000).
+- tfr: Sezione TFR.
+- leaveData: Sezione Ferie e Permessi.
 
-REGOLE DI VALIDAZIONE:
-- Il campo "netSalary" deve corrispondere esattamente al "NETTO DEL MESE" stampato in grande in fondo.
-- I numeri devono essere convertiti in formato standard (es. "1.400,50" diventa 1400.50).
+REGOLE DI VALIDAZIONE MATEMATICA:
+- incomeItems (somma) - deductionItems (somma) deve essere circa uguale al "netSalary".
+- Converti tutti i numeri in formato Javascript (es. "1.200,50" -> 1200.50).
 `;
 
     const response = await ai.models.generateContent({
@@ -633,8 +644,7 @@ REGOLE DI VALIDAZIONE:
         config: {
             responseMimeType: "application/json",
             responseSchema: payslipSchema,
-            // Abbassiamo la temperature per renderlo più deterministico e meno "creativo"
-            temperature: 0.1
+            temperature: 0.0 // ZERO creatività per massimizzare la precisione OCR
         }
     });
 
