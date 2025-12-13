@@ -119,14 +119,14 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
         if (mode === 'contextual') {
             return payslipsToCompare ? "Chiedimi qualcosa su queste due buste paga." : "Chiedimi qualcosa su questa specifica busta paga.";
         }
-        return "Chiedimi qualcosa sul tuo archivio o allega un documento.";
+        return "Esperto in buste paga, bonus, diritti del lavoro, legge 104, maternità e molto altro.";
     }
 
     const getIntroText = () => {
          if (mode === 'contextual') {
             return payslipsToCompare ? "Fai una domanda per approfondire il confronto tra questi due documenti." : "Fai una domanda per iniziare l'analisi di questo documento.";
         }
-        return "Puoi fare una domanda generale o allegare un file per un'analisi più specifica.";
+        return "Chiedi qualsiasi cosa sul mondo del lavoro: buste paga, bonus attivi, legge 104, maternità, tredicesima, ferie, diritti e molto altro.";
     }
     
     const getPlaceholder = () => {
