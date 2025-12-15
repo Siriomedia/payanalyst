@@ -36,7 +36,17 @@ const App: React.FC = () => {
             // NON cancelliamo più i dati utente - tutto è in Firestore
         }
     }, []);
-    const [currentView, setCurrentView] = useState<View>(View.Dashboard);
+
+    // Ripristina currentView da localStorage
+    const [currentView, setCurrentView] = useState<View>(() => {
+        try {
+            const saved = localStorage.getItem('gioia_currentView');
+            return saved ? (saved as View) : View.Dashboard;
+        } catch {
+            return View.Dashboard;
+        }
+    });
+
     const isUpdatingFromFirestore = useRef(false);
     const isAtomicCreditUpdate = useRef(false);
 
@@ -252,9 +262,19 @@ const App: React.FC = () => {
         catch { return []; }
     });
 
-    const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(
-        payslips.length > 0 ? payslips[0] : null
-    );
+    // Ripristina selectedPayslip da localStorage
+    const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(() => {
+        try {
+            const saved = localStorage.getItem('gioia_selectedPayslip');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return parsed as Payslip;
+            }
+        } catch {
+            // Ignore
+        }
+        return payslips.length > 0 ? payslips[0] : null;
+    });
 
     const [payslipsToCompare, setPayslipsToCompare] = useState<[Payslip, Payslip] | null>(null);
     const [alert, setAlert] = useState<string | null>(null);
@@ -278,6 +298,18 @@ const App: React.FC = () => {
     useEffect(() => {
         localStorage.setItem("gioia_absences", JSON.stringify(absences));
     }, [absences]);
+
+    // Persist currentView to localStorage
+    useEffect(() => {
+        localStorage.setItem('gioia_currentView', currentView);
+    }, [currentView]);
+
+    // Persist selectedPayslip to localStorage
+    useEffect(() => {
+        if (selectedPayslip) {
+            localStorage.setItem('gioia_selectedPayslip', JSON.stringify(selectedPayslip));
+        }
+    }, [selectedPayslip]);
 
     //
     // REMOVE MONTHLY RESET (PIANO A)

@@ -19,6 +19,22 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
     const [error, setError] = useState<string | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [showProfileAlert, setShowProfileAlert] = useState(false);
+    const [creditsConsumed, setCreditsConsumed] = useState(false);
+    const [showFileWarning, setShowFileWarning] = useState(false);
+
+    // Mostra avviso se c'era un file selezionato prima
+    useEffect(() => {
+        try {
+            const savedFileInfo = localStorage.getItem('gioia_upload_file_info');
+            if (savedFileInfo) {
+                setShowFileWarning(true);
+                // Rimuovi dopo averlo mostrato
+                localStorage.removeItem('gioia_upload_file_info');
+            }
+        } catch {
+            // Ignore
+        }
+    }, []);
 
     useEffect(() => {
         if (file && file.type.startsWith('image/')) {
@@ -27,6 +43,17 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
                 setPreviewUrl(reader.result as string);
             };
             reader.readAsDataURL(file);
+
+            // Salva info file in caso l'app venga minimizzata
+            try {
+                localStorage.setItem('gioia_upload_file_info', JSON.stringify({
+                    name: file.name,
+                    size: file.size,
+                    type: file.type
+                }));
+            } catch {
+                // Ignore
+            }
         } else {
             setPreviewUrl(null);
         }
@@ -41,6 +68,7 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
         if (e.target.files && e.target.files[0]) {
             setFile(e.target.files[0]);
             setError(null);
+            setShowFileWarning(false);
         }
     };
 
@@ -63,6 +91,13 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
         setFile(null);
         setPreviewUrl(null);
         setError(null);
+        setShowFileWarning(false);
+        // Rimuovi anche le info salvate
+        try {
+            localStorage.removeItem('gioia_upload_file_info');
+        } catch {
+            // Ignore
+        }
     };
 
     const isProfileComplete = () => {
@@ -98,20 +133,38 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
             return;
         }
 
-        if (!handleCreditConsumption(CREDIT_COSTS.PAYSLIP_ANALYSIS)) {
+        // Verifica crediti PRIMA, ma NON consumare ancora
+        if (user.role !== 'admin' && user.credits < CREDIT_COSTS.PAYSLIP_ANALYSIS) {
+            setError('Crediti insufficienti per analizzare la busta paga.');
             return;
         }
 
         setIsLoading(true);
         setError(null);
         setShowProfileAlert(false);
+        setCreditsConsumed(false);
+
         try {
             const payslipData = await analyzePayslip(file);
+
+            // Analisi completata con successo - ORA consuma i crediti
+            if (!creditsConsumed) {
+                handleCreditConsumption(CREDIT_COSTS.PAYSLIP_ANALYSIS);
+                setCreditsConsumed(true);
+            }
+
+            // Rimuovi info file salvate dopo successo
+            try {
+                localStorage.removeItem('gioia_upload_file_info');
+            } catch {
+                // Ignore
+            }
+
             onAnalysisComplete(payslipData);
         } catch (err) {
+            // Analisi fallita - NON consumare crediti
             setError('Analisi fallita. Assicurati che il documento sia una busta paga leggibile e riprova.');
             console.error(err);
-        } finally {
             setIsLoading(false);
         }
     };
@@ -119,6 +172,30 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
     return (
         <div className="max-w-2xl mx-auto">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 mb-4 sm:mb-6">Carica Busta Paga</h1>
+
+            {showFileWarning && !file && (
+                <div className="mb-4 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3 rounded-lg">
+                    <div className="flex items-start">
+                        <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold">Avevi selezionato un file</p>
+                            <p className="text-sm mt-1">Sembra che tu abbia interrotto il caricamento. Per procedere, seleziona nuovamente il file della busta paga.</p>
+                        </div>
+                        <button
+                            onClick={() => setShowFileWarning(false)}
+                            className="ml-2 text-amber-600 hover:text-amber-800"
+                            aria-label="Chiudi avviso"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-md">
                 {isLoading ? (
                     <div className="text-center">
