@@ -216,6 +216,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
     const loadDatabaseData = async () => {
         if (!userId) return;
 
+        console.log('📊 Caricamento dati Database Storico per userId:', userId);
         setIsLoadingDb(true);
         try {
             const [monthly, payslipsDb, stats] = await Promise.all([
@@ -224,6 +225,10 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                 calculateUserStatistics(userId)
             ]);
 
+            console.log('✅ Dati mensili caricati:', monthly.length, 'record');
+            console.log('✅ Buste paga caricate:', payslipsDb.length, 'record');
+            console.log('✅ Statistiche:', stats);
+
             setMonthlyData(monthly.sort((a, b) => {
                 if (a.year !== b.year) return b.year - a.year;
                 return b.month - a.month;
@@ -231,7 +236,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
             setDbPayslips(payslipsDb);
             setStatistics(stats);
         } catch (error) {
-            console.error('Errore caricamento dati database:', error);
+            console.error('❌ Errore caricamento dati database:', error);
         } finally {
             setIsLoadingDb(false);
         }
@@ -639,7 +644,26 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                             )}
 
                             {monthlyData.length === 0 && dbPayslips.length === 0 && !isLoadingDb && (
-                                <p className="text-center text-gray-500 mt-8">Nessun dato disponibile nel database.</p>
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mt-6">
+                                    <div className="text-center">
+                                        <h3 className="text-lg font-bold text-blue-900 mb-3">Database Storico Vuoto</h3>
+                                        <p className="text-blue-800 mb-4">
+                                            Il Database Storico si popola automaticamente quando carichi buste paga tramite le Cloud Functions.
+                                        </p>
+                                        <div className="bg-white rounded-lg p-4 mb-4 text-left">
+                                            <p className="font-semibold text-blue-900 mb-2">Come funziona:</p>
+                                            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                                                <li>Vai su "Carica Busta Paga"</li>
+                                                <li>Carica il PDF della tua busta paga</li>
+                                                <li>Le Cloud Functions elaborano il documento</li>
+                                                <li>I dati vengono salvati nel Database Storico</li>
+                                            </ol>
+                                        </div>
+                                        <p className="text-xs text-blue-600">
+                                            💡 I dati elaborati dalle Cloud Functions sono più dettagliati e permettono analisi avanzate con l'AI
+                                        </p>
+                                    </div>
+                                </div>
                             )}
                         </>
                     )}
