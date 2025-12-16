@@ -650,6 +650,7 @@ const App: React.FC = () => {
                                     }}
                                     onCompare={handleComparePayslips}
                                     onDeletePayslip={handleDeletePayslip}
+                                    userId={auth.currentUser?.uid}
                                 />
                             );
                         case View.Compare:

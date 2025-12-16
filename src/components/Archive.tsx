@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Payslip } from '../types.ts';
 import { EuroIcon, TrashIcon } from './common/Icons.tsx';
+import { getUserMonthlyData, getUserPayslips, calculateUserStatistics, MonthlyData, PayslipData } from '../services/databaseQueryService.ts';
+import Spinner from './common/Spinner.tsx';
 
 interface ArchiveProps {
     payslips: Payslip[];
     onSelectPayslip: (payslip: Payslip) => void;
     onCompare: (payslips: [Payslip, Payslip]) => void;
     onDeletePayslip: (payslipId: string) => void;
+    userId?: string;
 }
 
-const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare, onDeletePayslip }) => {
+const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare, onDeletePayslip, userId }) => {
     const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState<'local' | 'database'>('local');
+    const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+    const [dbPayslips, setDbPayslips] = useState<PayslipData[]>([]);
+    const [statistics, setStatistics] = useState<any>(null);
+    const [isLoadingDb, setIsLoadingDb] = useState(false);
     
     const toggleCompareSelection = (payslipId: string) => {
         setSelectedForCompare(prev => {
@@ -41,10 +49,40 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
     
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
 
+    useEffect(() => {
+        if (userId && activeTab === 'database') {
+            loadDatabaseData();
+        }
+    }, [userId, activeTab]);
+
+    const loadDatabaseData = async () => {
+        if (!userId) return;
+
+        setIsLoadingDb(true);
+        try {
+            const [monthly, payslipsDb, stats] = await Promise.all([
+                getUserMonthlyData(userId),
+                getUserPayslips(userId),
+                calculateUserStatistics(userId)
+            ]);
+
+            setMonthlyData(monthly.sort((a, b) => {
+                if (a.year !== b.year) return b.year - a.year;
+                return b.month - a.month;
+            }));
+            setDbPayslips(payslipsDb);
+            setStatistics(stats);
+        } catch (error) {
+            console.error('Errore caricamento dati database:', error);
+        } finally {
+            setIsLoadingDb(false);
+        }
+    };
+
     return (
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio Buste Paga</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio</h1>
                 {selectedForCompare.length === 2 ? (
                     <button 
                         type="button"
@@ -61,10 +99,35 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                     </span>
                 )}
             </div>
-            
-            {payslips.length === 0 ? (
-                <p className="text-center text-sm sm:text-base text-gray-500 mt-6 sm:mt-8">Nessuna busta paga in archivio.</p>
-            ) : (
+
+            {userId && (
+                <div className="mb-6 flex gap-2">
+                    <button
+                        onClick={() => setActiveTab('local')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                            activeTab === 'local'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                    >
+                        Archivio Locale
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('database')}
+                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                            activeTab === 'database'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                    >
+                        Database Storico
+                    </button>
+                </div>
+            )}
+
+            {activeTab === 'local' && payslips.length === 0 ? (
+                <p className="text-center text-sm sm:text-base text-gray-500 mt-6 sm:mt-8">Nessuna busta paga in archivio locale.</p>
+            ) : activeTab === 'local' ? (
                 <>
                 {selectedForCompare.length < 2 && (
                     <p className="text-sm text-gray-500 mb-3 italic">
@@ -116,7 +179,123 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                     </ul>
                 </div>
                 </>
-            )}
+            ) : activeTab === 'database' ? (
+                <div className="space-y-6">
+                    {isLoadingDb ? (
+                        <div className="flex justify-center items-center py-12">
+                            <Spinner />
+                        </div>
+                    ) : (
+                        <>
+                            {/* Statistiche Generali */}
+                            {statistics && statistics.totalPayslips > 0 && (
+                                <div className="bg-white rounded-xl shadow-md p-6">
+                                    <h2 className="text-xl font-bold text-gray-800 mb-4">Statistiche Generali</h2>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-600">Buste Paga Elaborate</p>
+                                            <p className="text-2xl font-bold text-blue-600">{statistics.totalPayslips}</p>
+                                        </div>
+                                        {statistics.averageSalary && (
+                                            <div className="bg-green-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-600">Paga Media</p>
+                                                <p className="text-2xl font-bold text-green-600">€{statistics.averageSalary.toFixed(2)}</p>
+                                            </div>
+                                        )}
+                                        {statistics.totalLeaveRemaining !== null && (
+                                            <div className="bg-purple-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-600">Ferie Residue</p>
+                                                <p className="text-2xl font-bold text-purple-600">{statistics.totalLeaveRemaining}</p>
+                                            </div>
+                                        )}
+                                        {statistics.tfr && (
+                                            <div className="bg-orange-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-600">TFR Progressivo</p>
+                                                <p className="text-2xl font-bold text-orange-600">€{statistics.tfr.toFixed(2)}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Dati Mensili */}
+                            {monthlyData.length > 0 && (
+                                <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                                    <div className="p-4 bg-gray-50 border-b border-gray-200">
+                                        <h2 className="text-xl font-bold text-gray-800">Dati Mensili Aggregati</h2>
+                                        <p className="text-sm text-gray-600 mt-1">Dati estratti e elaborati dalle Cloud Functions</p>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mese</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Paga Base</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Ferie Residue</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Permessi Residui</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">TFR Progressivo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-200">
+                                                {monthlyData.map((data) => (
+                                                    <tr key={data.id} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-3 text-sm font-semibold text-gray-800 capitalize">
+                                                            {getMonthName(data.month)} {data.year}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                                                            {data.paga_base ? `€${data.paga_base.toFixed(2)}` : 'N/D'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                                                            {data.ferie.residue ?? 'N/D'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                                                            {data.permessi.residui ?? 'N/D'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                                                            {data.tfr.progressivo ? `€${data.tfr.progressivo.toFixed(2)}` : 'N/D'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Buste Paga nel Database */}
+                            {dbPayslips.length > 0 && (
+                                <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                                    <div className="p-4 bg-gray-50 border-b border-gray-200">
+                                        <h2 className="text-xl font-bold text-gray-800">Buste Paga Elaborate</h2>
+                                        <p className="text-sm text-gray-600 mt-1">Documenti processati dalle Cloud Functions</p>
+                                    </div>
+                                    <ul className="divide-y divide-gray-200">
+                                        {dbPayslips.map((payslip) => (
+                                            <li key={payslip.id} className="p-4 hover:bg-gray-50">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="font-semibold text-gray-800 capitalize">
+                                                            {getMonthName(payslip.month)} {payslip.year}
+                                                        </p>
+                                                        <p className="text-sm text-gray-500">ID: {payslip.id}</p>
+                                                        <p className="text-xs text-gray-400 mt-1">
+                                                            Status: <span className="font-semibold text-green-600">{payslip.status}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {monthlyData.length === 0 && dbPayslips.length === 0 && !isLoadingDb && (
+                                <p className="text-center text-gray-500 mt-8">Nessun dato disponibile nel database.</p>
+                            )}
+                        </>
+                    )}
+                </div>
+            ) : null}
         </div>
     );
 };
