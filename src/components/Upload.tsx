@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzePayslip } from '../services/geminiService.ts';
+import { savePayslipToFirestore } from '../services/firestorePayslipService.ts';
 import { Payslip } from '../types.ts';
 import Spinner from './common/Spinner.tsx';
 import { UploadIcon } from './common/Icons.tsx';
@@ -151,6 +152,14 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
             if (!creditsConsumed) {
                 handleCreditConsumption(CREDIT_COSTS.PAYSLIP_ANALYSIS);
                 setCreditsConsumed(true);
+            }
+
+            // Salva i dati anche nel Database Storico (Firestore)
+            try {
+                await savePayslipToFirestore(user.uid, payslipData);
+                console.log('✅ Dati salvati nel Database Storico');
+            } catch (firestoreError) {
+                console.error('⚠️ Errore salvando nel Database Storico:', firestoreError);
             }
 
             // Rimuovi info file salvate dopo successo
