@@ -1127,6 +1127,8 @@ export const getChatResponse = async (
         focusedPayslip?: Payslip | null;
         payslipsToCompare?: [Payslip, Payslip] | null;
         includeTaxTables?: boolean;
+        userId?: string;
+        databaseContext?: string;
     }
 ) => {
     let systemInstruction = `Sei un esperto consulente del lavoro che aiuta le persone a capire tutto ciò che riguarda il mondo del lavoro a 360 gradi. Hai una conoscenza completa su: buste paga, contratti, diritti dei lavoratori, agevolazioni, bonus, maternità, paternità, legge 104, tredicesima, quattordicesima, ferie, permessi, malattia, congedi, contributi, pensioni, TFR, licenziamenti, dimissioni, CCNL e molto altro.
@@ -1247,6 +1249,10 @@ Se non hai un dato specifico nella busta paga, dillo chiaramente e spiega dove p
 
     if (context.includeTaxTables) {
         systemInstruction += `\nL'utente ha richiesto di usare come riferimento il seguente documento con le tabelle delle addizionali comunali. Usalo come contesto per rispondere a domande relative a questo argomento.\n\n--- INIZIO DOCUMENTO ADDIZIONALI COMUNALI ---\n${MUNICIPAL_TAX_TABLES_TEXT}\n--- FINE DOCUMENTO ADDIZIONALI COMUNALI ---`;
+    }
+
+    if (context.databaseContext) {
+        systemInstruction += `\n\n${context.databaseContext}\n\nQuando l'utente ti fa domande sui suoi dati (es. "Quante ferie ho maturato?", "Qual è la mia paga media?", "Come è cambiato il mio TFR?"), usa SEMPRE i dati del CONTESTO DATABASE sopra per rispondere con precisione. Analizza i dati, calcola trend, fornisci statistiche e insights utili.`;
     }
 
     const conversationHistory = history.map(msg => ({

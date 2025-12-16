@@ -18,6 +18,7 @@ interface DashboardProps {
     alert: string | null;
     payslips: Payslip[];
     handleCreditConsumption: (cost: number) => boolean;
+    userId?: string;
 }
 
 const DetailRow: React.FC<{ label: string, value: string | number | undefined, currency?: boolean, unit?: string }> = ({ label, value, currency = false, unit }) => (
@@ -53,7 +54,7 @@ const PayItemTable: React.FC<{ title: string, items: PayItem[], colorClass: stri
     </div>
 );
 
-const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleCreditConsumption }) => {
+const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleCreditConsumption, userId }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'historical'>('overview');
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
     const [pdfSummary, setPdfSummary] = useState<string | null>(null);
@@ -373,7 +374,7 @@ const Dashboard: React.FC<DashboardProps> = ({ payslip, alert, payslips, handleC
                         </div>
                         {/* Modal Body */}
                         <div className="flex-1 overflow-hidden">
-                            <Assistant mode="contextual" focusedPayslip={payslip} payslips={[]} handleCreditConsumption={handleCreditConsumption} />
+                            <Assistant mode="contextual" focusedPayslip={payslip} payslips={[]} handleCreditConsumption={handleCreditConsumption} userId={userId} />
                         </div>
                     </div>
                 </div>

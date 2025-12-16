@@ -4,6 +4,7 @@ import { ChatMessage, Payslip } from '../types.ts';
 import { SendIcon, PaperclipIcon } from './common/Icons.tsx';
 import Spinner from './common/Spinner.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
+import { buildUserDatabaseContext } from '../services/databaseQueryService.ts';
 
 interface AssistantProps {
     payslips: Payslip[];
@@ -11,9 +12,10 @@ interface AssistantProps {
     focusedPayslip?: Payslip | null;
     payslipsToCompare?: [Payslip, Payslip] | null;
     handleCreditConsumption: (cost: number) => boolean;
+    userId?: string;
 }
 
-const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption }) => {
+const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption, userId }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
@@ -57,9 +59,18 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
         setAttachment(null);
         setIsLoading(true);
 
-        const context = mode === 'general' 
-            ? { payslips, file: currentAttachment, includeTaxTables }
-            : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare };
+        let databaseContext: string | undefined;
+        if (userId) {
+            try {
+                databaseContext = await buildUserDatabaseContext(userId);
+            } catch (error) {
+                console.error('Errore costruzione contesto database:', error);
+            }
+        }
+
+        const context = mode === 'general'
+            ? { payslips, file: currentAttachment, includeTaxTables, userId, databaseContext }
+            : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare, userId, databaseContext };
 
         try {
             const stream = await getChatResponse(history, currentInput, context);

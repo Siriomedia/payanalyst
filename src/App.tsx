@@ -629,6 +629,7 @@ const App: React.FC = () => {
                                     alert={alert}
                                     payslips={payslips}
                                     handleCreditConsumption={handleCreditConsumption}
+                                    userId={auth.currentUser?.uid}
                                 />
                             );
                         case View.Upload:
@@ -659,12 +660,13 @@ const App: React.FC = () => {
                                     payslips={payslips}
                                     mode="general"
                                     handleCreditConsumption={handleCreditConsumption}
+                                    userId={auth.currentUser?.uid}
                                 />
                             );
                         case View.AdminPanel:
                             return user.role === "admin"
                                 ? <AdminPanel user={user} />
-                                : <Dashboard payslip={selectedPayslip} alert={alert} payslips={payslips} handleCreditConsumption={handleCreditConsumption} />;
+                                : <Dashboard payslip={selectedPayslip} alert={alert} payslips={payslips} handleCreditConsumption={handleCreditConsumption} userId={auth.currentUser?.uid} />;
                         case View.ShiftPlanner:
                             return <ShiftPlanner shifts={shifts} onSave={() => {}} onDelete={() => {}} absences={absences} onSaveAbsence={() => {}} onDeleteAbsence={() => {}} />;
                         case View.LeavePlanner:
