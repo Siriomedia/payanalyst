@@ -277,6 +277,7 @@ const App: React.FC = () => {
 
     const [alert, setAlert] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [databaseContext, setDatabaseContext] = useState<string | null>(null);
 
     //
     // PERSIST LOCAL DATA TO LOCALSTORAGE
@@ -628,6 +629,10 @@ const App: React.FC = () => {
                                     }}
                                     onDeletePayslip={handleDeletePayslip}
                                     userId={auth.currentUser?.uid}
+                                    onAnalyzeWithAssistant={(csvData) => {
+                                        setDatabaseContext(csvData);
+                                        setCurrentView(View.Assistant);
+                                    }}
                                 />
                             );
                         case View.Assistant:
@@ -637,6 +642,8 @@ const App: React.FC = () => {
                                     mode="general"
                                     handleCreditConsumption={handleCreditConsumption}
                                     userId={auth.currentUser?.uid}
+                                    externalDatabaseContext={databaseContext}
+                                    onClearDatabaseContext={() => setDatabaseContext(null)}
                                 />
                             );
                         case View.AdminPanel:

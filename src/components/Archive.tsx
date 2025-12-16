@@ -9,6 +9,7 @@ interface ArchiveProps {
     onSelectPayslip: (payslip: Payslip) => void;
     onDeletePayslip: (payslipId: string) => void;
     userId?: string;
+    onAnalyzeWithAssistant?: (csvData: string) => void;
 }
 
 interface Filters {
@@ -24,7 +25,7 @@ interface Filters {
     maxTfr: string;
 }
 
-const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePayslip, userId }) => {
+const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePayslip, userId, onAnalyzeWithAssistant }) => {
     const [activeTab, setActiveTab] = useState<'local' | 'database'>('local');
     const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
     const [dbPayslips, setDbPayslips] = useState<PayslipData[]>([]);
@@ -138,6 +139,70 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
         document.body.removeChild(link);
 
         URL.revokeObjectURL(url);
+    };
+
+    const exportDatabaseToCSV = () => {
+        if (filteredMonthlyData.length === 0) {
+            alert('Nessun dato da esportare');
+            return;
+        }
+
+        const headers = [
+            'Anno',
+            'Mese',
+            'Paga Base (€)',
+            'Ferie Residue (ore)',
+            'Permessi Residui (ore)',
+            'TFR Progressivo (€)'
+        ];
+
+        const rows = filteredMonthlyData.map((data) => [
+            data.year,
+            data.month,
+            data.paga_base ? data.paga_base.toFixed(2) : 'N/D',
+            data.ferie.residue ?? 'N/D',
+            data.permessi.residui ?? 'N/D',
+            data.tfr.progressivo ? data.tfr.progressivo.toFixed(2) : 'N/D'
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const today = new Date();
+        const filename = `database_storico_${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, '0')}_${String(today.getDate()).padStart(2, '0')}.csv`;
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+    };
+
+    const analyzeWithAssistant = () => {
+        if (!onAnalyzeWithAssistant) return;
+        if (filteredMonthlyData.length === 0) {
+            alert('Nessun dato da analizzare');
+            return;
+        }
+
+        const headers = ['Anno', 'Mese', 'Paga Base (€)', 'Ferie Residue (ore)', 'Permessi Residui (ore)', 'TFR Progressivo (€)'];
+        const rows = filteredMonthlyData.map((data) =>
+            `${data.year},${data.month},${data.paga_base ? data.paga_base.toFixed(2) : 'N/D'},${data.ferie.residue ?? 'N/D'},${data.permessi.residui ?? 'N/D'},${data.tfr.progressivo ? data.tfr.progressivo.toFixed(2) : 'N/D'}`
+        );
+
+        const csvData = [headers.join(','), ...rows].join('\n');
+        onAnalyzeWithAssistant(csvData);
     };
 
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
@@ -347,17 +412,31 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                             {monthlyData.length > 0 && (
                                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
                                     <div className="p-4 bg-gray-50 border-b border-gray-200">
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                             <div>
                                                 <h2 className="text-xl font-bold text-gray-800">Dati Mensili Aggregati</h2>
                                                 <p className="text-sm text-gray-600 mt-1">Dati estratti e elaborati dalle Cloud Functions</p>
                                             </div>
-                                            <button
-                                                onClick={() => setShowFilters(!showFilters)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
-                                            >
-                                                {showFilters ? 'Nascondi Filtri' : 'Mostra Filtri'}
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={exportDatabaseToCSV}
+                                                    className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm whitespace-nowrap"
+                                                >
+                                                    Esporta CSV
+                                                </button>
+                                                <button
+                                                    onClick={analyzeWithAssistant}
+                                                    className="px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-semibold text-sm whitespace-nowrap"
+                                                >
+                                                    Analizza con AI
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowFilters(!showFilters)}
+                                                    className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm whitespace-nowrap"
+                                                >
+                                                    {showFilters ? 'Nascondi Filtri' : 'Mostra Filtri'}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 

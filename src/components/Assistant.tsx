@@ -13,9 +13,11 @@ interface AssistantProps {
     payslipsToCompare?: [Payslip, Payslip] | null;
     handleCreditConsumption: (cost: number) => boolean;
     userId?: string;
+    externalDatabaseContext?: string | null;
+    onClearDatabaseContext?: () => void;
 }
 
-const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption, userId }) => {
+const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption, userId, externalDatabaseContext, onClearDatabaseContext }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
@@ -69,7 +71,7 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
         }
 
         const context = mode === 'general'
-            ? { payslips, file: currentAttachment, includeTaxTables, userId, databaseContext }
+            ? { payslips, file: currentAttachment, includeTaxTables, userId, databaseContext, externalDatabaseContext }
             : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare, userId, databaseContext };
 
         try {
@@ -154,6 +156,25 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
                     {getSubheader()}
                 </p>
             </div>
+
+            {externalDatabaseContext && (
+                <div className="p-3 bg-purple-50 border-b border-purple-200">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <span className="text-purple-700 font-semibold text-sm">Database Storico caricato</span>
+                            <span className="text-xs text-purple-600">Dati pronti per l'analisi</span>
+                        </div>
+                        <button
+                            onClick={onClearDatabaseContext}
+                            className="text-purple-700 hover:text-purple-900 font-bold text-lg"
+                            aria-label="Rimuovi contesto database"
+                        >
+                            ×
+                        </button>
+                    </div>
+                </div>
+            )}
+
              <div className="p-4 border-b border-gray-200">
                 {attachment && mode === 'general' && (
                     <div className="mb-2 px-3 py-1.5 bg-blue-100 text-blue-800 text-sm rounded-full inline-block">
