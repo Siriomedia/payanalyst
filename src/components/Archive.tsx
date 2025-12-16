@@ -12,6 +12,19 @@ interface ArchiveProps {
     userId?: string;
 }
 
+interface Filters {
+    year: string;
+    month: string;
+    minSalary: string;
+    maxSalary: string;
+    minVacation: string;
+    maxVacation: string;
+    minPermits: string;
+    maxPermits: string;
+    minTfr: string;
+    maxTfr: string;
+}
+
 const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare, onDeletePayslip, userId }) => {
     const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
     const [activeTab, setActiveTab] = useState<'local' | 'database'>('local');
@@ -19,6 +32,19 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
     const [dbPayslips, setDbPayslips] = useState<PayslipData[]>([]);
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingDb, setIsLoadingDb] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState<Filters>({
+        year: '',
+        month: '',
+        minSalary: '',
+        maxSalary: '',
+        minVacation: '',
+        maxVacation: '',
+        minPermits: '',
+        maxPermits: '',
+        minTfr: '',
+        maxTfr: ''
+    });
 
     const exportToCSV = () => {
         if (payslips.length === 0) {
@@ -175,6 +201,61 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         }
     };
 
+    const applyFilters = (data: MonthlyData[]) => {
+        return data.filter((item) => {
+            if (filters.year && item.year.toString() !== filters.year) return false;
+            if (filters.month && item.month.toString() !== filters.month) return false;
+
+            if (filters.minSalary && item.paga_base) {
+                if (item.paga_base < parseFloat(filters.minSalary)) return false;
+            }
+            if (filters.maxSalary && item.paga_base) {
+                if (item.paga_base > parseFloat(filters.maxSalary)) return false;
+            }
+
+            if (filters.minVacation && item.ferie.residue !== null) {
+                if (item.ferie.residue < parseFloat(filters.minVacation)) return false;
+            }
+            if (filters.maxVacation && item.ferie.residue !== null) {
+                if (item.ferie.residue > parseFloat(filters.maxVacation)) return false;
+            }
+
+            if (filters.minPermits && item.permessi.residui !== null) {
+                if (item.permessi.residui < parseFloat(filters.minPermits)) return false;
+            }
+            if (filters.maxPermits && item.permessi.residui !== null) {
+                if (item.permessi.residui > parseFloat(filters.maxPermits)) return false;
+            }
+
+            if (filters.minTfr && item.tfr.progressivo) {
+                if (item.tfr.progressivo < parseFloat(filters.minTfr)) return false;
+            }
+            if (filters.maxTfr && item.tfr.progressivo) {
+                if (item.tfr.progressivo > parseFloat(filters.maxTfr)) return false;
+            }
+
+            return true;
+        });
+    };
+
+    const resetFilters = () => {
+        setFilters({
+            year: '',
+            month: '',
+            minSalary: '',
+            maxSalary: '',
+            minVacation: '',
+            maxVacation: '',
+            minPermits: '',
+            maxPermits: '',
+            minTfr: '',
+            maxTfr: ''
+        });
+    };
+
+    const availableYears = Array.from(new Set(monthlyData.map(d => d.year))).sort((a, b) => b - a);
+    const filteredMonthlyData = applyFilters(monthlyData);
+
     return (
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
@@ -330,9 +411,154 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                             {monthlyData.length > 0 && (
                                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
                                     <div className="p-4 bg-gray-50 border-b border-gray-200">
-                                        <h2 className="text-xl font-bold text-gray-800">Dati Mensili Aggregati</h2>
-                                        <p className="text-sm text-gray-600 mt-1">Dati estratti e elaborati dalle Cloud Functions</p>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h2 className="text-xl font-bold text-gray-800">Dati Mensili Aggregati</h2>
+                                                <p className="text-sm text-gray-600 mt-1">Dati estratti e elaborati dalle Cloud Functions</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowFilters(!showFilters)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm"
+                                            >
+                                                {showFilters ? 'Nascondi Filtri' : 'Mostra Filtri'}
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {showFilters && (
+                                        <div className="p-6 bg-gray-50 border-b border-gray-200">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Filtri di Ricerca</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Anno</label>
+                                                    <select
+                                                        value={filters.year}
+                                                        onChange={(e) => setFilters({...filters, year: e.target.value})}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    >
+                                                        <option value="">Tutti</option>
+                                                        {availableYears.map(year => (
+                                                            <option key={year} value={year}>{year}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Mese</label>
+                                                    <select
+                                                        value={filters.month}
+                                                        onChange={(e) => setFilters({...filters, month: e.target.value})}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    >
+                                                        <option value="">Tutti</option>
+                                                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                                                            <option key={m} value={m}>{getMonthName(m)}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Paga Min (€)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.minSalary}
+                                                        onChange={(e) => setFilters({...filters, minSalary: e.target.value})}
+                                                        placeholder="0"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Paga Max (€)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.maxSalary}
+                                                        onChange={(e) => setFilters({...filters, maxSalary: e.target.value})}
+                                                        placeholder="999999"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ferie Min (ore)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.minVacation}
+                                                        onChange={(e) => setFilters({...filters, minVacation: e.target.value})}
+                                                        placeholder="0"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Ferie Max (ore)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.maxVacation}
+                                                        onChange={(e) => setFilters({...filters, maxVacation: e.target.value})}
+                                                        placeholder="999"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Permessi Min (ore)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.minPermits}
+                                                        onChange={(e) => setFilters({...filters, minPermits: e.target.value})}
+                                                        placeholder="0"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Permessi Max (ore)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.maxPermits}
+                                                        onChange={(e) => setFilters({...filters, maxPermits: e.target.value})}
+                                                        placeholder="999"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">TFR Min (€)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.minTfr}
+                                                        onChange={(e) => setFilters({...filters, minTfr: e.target.value})}
+                                                        placeholder="0"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">TFR Max (€)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={filters.maxTfr}
+                                                        onChange={(e) => setFilters({...filters, maxTfr: e.target.value})}
+                                                        placeholder="999999"
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 mt-4">
+                                                <button
+                                                    onClick={resetFilters}
+                                                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-sm"
+                                                >
+                                                    Resetta Filtri
+                                                </button>
+                                                <div className="text-sm text-gray-600 flex items-center ml-2">
+                                                    Risultati: {filteredMonthlyData.length} / {monthlyData.length}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="overflow-x-auto">
                                         <table className="w-full">
                                             <thead className="bg-gray-100">
@@ -345,7 +571,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-200">
-                                                {monthlyData.map((data) => (
+                                                {filteredMonthlyData.map((data) => (
                                                     <tr key={data.id} className="hover:bg-gray-50">
                                                         <td className="px-4 py-3 text-sm font-semibold text-gray-800 capitalize">
                                                             {getMonthName(data.month)} {data.year}
