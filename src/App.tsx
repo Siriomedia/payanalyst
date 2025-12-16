@@ -3,7 +3,6 @@ import Layout from './components/Layout.tsx';
 import Dashboard from './components/Dashboard.tsx';
 import Upload from './components/Upload.tsx';
 import Archive from './components/Archive.tsx';
-import Compare from './components/Compare.tsx';
 import Assistant from './components/Assistant.tsx';
 import Login from './components/Login.tsx';
 import Settings from './components/Settings.tsx';
@@ -276,7 +275,6 @@ const App: React.FC = () => {
         return payslips.length > 0 ? payslips[0] : null;
     });
 
-    const [payslipsToCompare, setPayslipsToCompare] = useState<[Payslip, Payslip] | null>(null);
     const [alert, setAlert] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -552,25 +550,6 @@ const App: React.FC = () => {
     };
 
     //
-    // COMPARE PAYSLIPS - Navigate to Compare view
-    //
-    const handleComparePayslips = (payslipsToCompareArr: [Payslip, Payslip]) => {
-        // Prima controlla i crediti
-        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
-        if (!canProceed) {
-            return;
-        }
-        
-        // Imposta le buste paga da confrontare e naviga
-        setPayslipsToCompare(payslipsToCompareArr);
-        
-        // Naviga alla vista Confronto
-        setTimeout(() => {
-            setCurrentView(View.Compare);
-        }, 0);
-    };
-
-    //
     // HANDLE ONBOARDING COMPLETE
     //
     const handleOnboardingComplete = async (updatedData: { firstName: string; lastName: string; dateOfBirth: string; placeOfBirth: string }) => {
@@ -600,7 +579,6 @@ const App: React.FC = () => {
         setLeavePlans([]);
         setAbsences([]);
         setSelectedPayslip(null);
-        setPayslipsToCompare(null);
         setAlert(null);
         setCurrentView(View.Dashboard);
     };
@@ -648,13 +626,10 @@ const App: React.FC = () => {
                                         setSelectedPayslip(p);
                                         setCurrentView(View.Dashboard);
                                     }}
-                                    onCompare={handleComparePayslips}
                                     onDeletePayslip={handleDeletePayslip}
                                     userId={auth.currentUser?.uid}
                                 />
                             );
-                        case View.Compare:
-                            return <Compare payslips={payslipsToCompare} />;
                         case View.Assistant:
                             return (
                                 <Assistant
