@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Payslip } from '../types.ts';
 import { EuroIcon, TrashIcon } from './common/Icons.tsx';
-import { getUserMonthlyData, getUserPayslips, calculateUserStatistics, MonthlyData, PayslipData } from '../services/databaseQueryService.ts';
+import { getUserMonthlyData, getUserPayslipsForArchive, calculateUserStatistics, MonthlyData, PayslipData } from '../services/payslipService.ts';
 import Spinner from './common/Spinner.tsx';
 
 interface ArchiveProps {
@@ -221,7 +221,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
         try {
             const [monthly, payslipsDb, stats] = await Promise.all([
                 getUserMonthlyData(userId),
-                getUserPayslips(userId),
+                getUserPayslipsForArchive(userId),
                 calculateUserStatistics(userId)
             ]);
 

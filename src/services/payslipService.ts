@@ -152,3 +152,140 @@ export const downloadCSV = (csvContent: string, filename: string = 'buste_paga.c
 
     URL.revokeObjectURL(url);
 };
+
+export interface PayslipData {
+    id: string;
+    userId: string;
+    year: number;
+    month: number;
+    netSalary: number;
+    grossSalary: number;
+    totalDeductions: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface MonthlyData {
+    id: string;
+    userId: string;
+    year: number;
+    month: number;
+    netSalary: number;
+    grossSalary: number;
+    totalDeductions: number;
+    items: any;
+    updatedAt: string;
+}
+
+export async function getUserPayslipsForArchive(userId: string, limitCount?: number): Promise<PayslipData[]> {
+    let query = supabase
+        .from('payslips')
+        .select('*')
+        .eq('user_id', userId)
+        .order('period_year', { ascending: false })
+        .order('period_month', { ascending: false });
+
+    if (limitCount) {
+        query = query.limit(limitCount);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        console.error('❌ Errore caricamento buste paga:', error);
+        throw error;
+    }
+
+    return (data || []).map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        year: row.period_year,
+        month: row.period_month,
+        netSalary: Number(row.net_salary),
+        grossSalary: Number(row.gross_salary),
+        totalDeductions: Number(row.total_deductions),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    }));
+}
+
+export async function getUserMonthlyData(userId: string): Promise<MonthlyData[]> {
+    const { data, error } = await supabase
+        .from('monthly_data')
+        .select('*')
+        .eq('user_id', userId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
+    if (error) {
+        console.error('❌ Errore caricamento dati mensili:', error);
+        throw error;
+    }
+
+    return (data || []).map(row => ({
+        id: row.id,
+        userId: row.user_id,
+        year: row.year,
+        month: row.month,
+        netSalary: Number(row.net_salary),
+        grossSalary: Number(row.gross_salary),
+        totalDeductions: Number(row.total_deductions),
+        items: row.items,
+        updatedAt: row.updated_at
+    }));
+}
+
+export async function calculateUserStatistics(userId: string): Promise<{
+    totalPayslips: number;
+    averageSalary: number | null;
+    totalLeaveAccrued: number | null;
+    totalLeaveUsed: number | null;
+    totalLeaveRemaining: number | null;
+    tfr: number | null;
+}> {
+    try {
+        const monthlyData = await getUserMonthlyData(userId);
+
+        if (monthlyData.length === 0) {
+            return {
+                totalPayslips: 0,
+                averageSalary: null,
+                totalLeaveAccrued: null,
+                totalLeaveUsed: null,
+                totalLeaveRemaining: null,
+                tfr: null,
+            };
+        }
+
+        const salaries = monthlyData
+            .filter(d => d.netSalary > 0)
+            .map(d => d.netSalary);
+
+        const averageSalary = salaries.length > 0
+            ? salaries.reduce((sum, val) => sum + val, 0) / salaries.length
+            : null;
+
+        const latestData = monthlyData[0];
+        const latestItems = latestData?.items || {};
+        const leaveData = latestItems.leaveData || {};
+
+        return {
+            totalPayslips: monthlyData.length,
+            averageSalary,
+            totalLeaveAccrued: leaveData.vacation?.accrued ?? null,
+            totalLeaveUsed: leaveData.vacation?.used ?? null,
+            totalLeaveRemaining: leaveData.vacation?.balance ?? null,
+            tfr: latestItems.tfr?.totalFund ?? null,
+        };
+    } catch (error) {
+        console.error('❌ Errore calcolo statistiche:', error);
+        return {
+            totalPayslips: 0,
+            averageSalary: null,
+            totalLeaveAccrued: null,
+            totalLeaveUsed: null,
+            totalLeaveRemaining: null,
+            tfr: null,
+        };
+    }
+}

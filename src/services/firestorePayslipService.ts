@@ -1,129 +1,119 @@
-import {
-    getFirestore,
-    collection,
-    doc,
-    setDoc,
-    serverTimestamp
-} from 'firebase/firestore';
+import { supabase } from '../supabase.ts';
 import { Payslip } from '../types.ts';
 
-export async function savePayslipToFirestore(userId: string, payslip: Payslip): Promise<void> {
-    const db = getFirestore();
-
-    const payslipId = payslip.id || `payslip-${Date.now()}-${Math.random()}`;
-
-    const payslipDoc = {
-        userId: userId,
-        year: payslip.year,
-        month: payslip.month,
-        status: 'done',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        sourceTextPreview: `Busta paga ${payslip.month}/${payslip.year} - Netto: €${payslip.netSalary.toFixed(2)}`
-    };
-
-    const analysisDoc = {
-        extracted: {
-            year: payslip.year,
-            month: payslip.month,
-            paga_base: extractPagaBase(payslip),
-            ferie: {
-                maturate: payslip.leaveData?.vacation?.accrued || null,
-                godute: payslip.leaveData?.vacation?.used || null,
-                residue: payslip.leaveData?.vacation?.balance || null
-            },
-            permessi: {
-                maturati: payslip.leaveData?.personalLeave?.accrued || null,
-                goduti: payslip.leaveData?.personalLeave?.used || null,
-                residui: payslip.leaveData?.personalLeave?.balance || null
-            },
-            rol: {
-                maturati: payslip.leaveData?.rol?.accrued || null,
-                goduti: payslip.leaveData?.rol?.used || null,
-                residui: payslip.leaveData?.rol?.balance || null
-            },
-            tfr: {
-                quota_mese: payslip.tfr?.monthlyAccrual || null,
-                progressivo: payslip.tfr?.totalFund || null
-            },
-            malattia: {
-                giorni: null,
-                ore: null,
-                trattenute: null
-            },
-            confidence: 0.9,
-            warnings: []
-        },
-        rawModelOutput: JSON.stringify(payslip),
-        confidence: 0.9,
-        warnings: [],
-        createdAt: serverTimestamp()
-    };
-
-    const monthKey = `${payslip.year}-${payslip.month.toString().padStart(2, '0')}`;
-    const monthlyDoc = {
-        year: payslip.year,
-        month: payslip.month,
-        paga_base: extractPagaBase(payslip),
-        ferie: {
-            maturate: payslip.leaveData?.vacation?.accrued || null,
-            godute: payslip.leaveData?.vacation?.used || null,
-            residue: payslip.leaveData?.vacation?.balance || null
-        },
-        permessi: {
-            maturati: payslip.leaveData?.personalLeave?.accrued || null,
-            goduti: payslip.leaveData?.personalLeave?.used || null,
-            residui: payslip.leaveData?.personalLeave?.balance || null
-        },
-        rol: {
-            maturati: payslip.leaveData?.rol?.accrued || null,
-            goduti: payslip.leaveData?.rol?.used || null,
-            residui: payslip.leaveData?.rol?.balance || null
-        },
-        tfr: {
-            quota_mese: payslip.tfr?.monthlyAccrual || null,
-            progressivo: payslip.tfr?.totalFund || null
-        },
-        malattia: {
-            giorni: null,
-            ore: null,
-            trattenute: null
-        },
-        sourcePayslipId: payslipId,
-        updatedAt: serverTimestamp()
-    };
-
+export async function savePayslipToDatabase(userId: string, payslip: Payslip): Promise<void> {
     try {
-        console.log('💾 Salvando busta paga in Firestore...');
-        console.log('   - Payslip ID:', payslipId);
+        console.log('💾 Salvando busta paga in Supabase...');
         console.log('   - User ID:', userId);
         console.log('   - Periodo:', `${payslip.month}/${payslip.year}`);
 
-        await setDoc(doc(db, 'payslips', payslipId), payslipDoc);
-        console.log('✅ Documento payslip salvato');
+        const { data: existingPayslip, error: checkError } = await supabase
+            .from('payslips')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('period_month', payslip.month)
+            .eq('period_year', payslip.year)
+            .maybeSingle();
 
-        await setDoc(doc(db, 'payslips', payslipId, 'analysis', 'result'), analysisDoc);
-        console.log('✅ Analisi salvata');
+        if (checkError) {
+            console.error('❌ Errore verificando buste paga esistenti:', checkError);
+            throw checkError;
+        }
 
-        await setDoc(doc(db, 'users', userId, 'monthly', monthKey), monthlyDoc);
-        console.log('✅ Dati mensili salvati');
+        const payslipData = {
+            user_id: userId,
+            period_month: payslip.month,
+            period_year: payslip.year,
+            employee_first_name: payslip.employeeInfo?.firstName || '',
+            employee_last_name: payslip.employeeInfo?.lastName || '',
+            company_name: payslip.employerInfo?.companyName || '',
+            net_salary: payslip.netSalary,
+            gross_salary: payslip.grossSalary,
+            total_deductions: payslip.totalDeductions,
+            data: payslip
+        };
+
+        if (existingPayslip) {
+            console.log('📝 Aggiornando busta paga esistente...');
+            const { error: updateError } = await supabase
+                .from('payslips')
+                .update({ ...payslipData, updated_at: new Date().toISOString() })
+                .eq('id', existingPayslip.id);
+
+            if (updateError) {
+                console.error('❌ Errore aggiornando busta paga:', updateError);
+                throw updateError;
+            }
+            console.log('✅ Busta paga aggiornata');
+        } else {
+            console.log('➕ Inserendo nuova busta paga...');
+            const { error: insertError } = await supabase
+                .from('payslips')
+                .insert(payslipData);
+
+            if (insertError) {
+                console.error('❌ Errore inserendo busta paga:', insertError);
+                throw insertError;
+            }
+            console.log('✅ Busta paga inserita');
+        }
+
+        const { data: existingMonthly, error: monthlyCheckError } = await supabase
+            .from('monthly_data')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('month', payslip.month)
+            .eq('year', payslip.year)
+            .maybeSingle();
+
+        if (monthlyCheckError) {
+            console.error('❌ Errore verificando dati mensili:', monthlyCheckError);
+            throw monthlyCheckError;
+        }
+
+        const monthlyData = {
+            user_id: userId,
+            month: payslip.month,
+            year: payslip.year,
+            net_salary: payslip.netSalary,
+            gross_salary: payslip.grossSalary,
+            total_deductions: payslip.totalDeductions,
+            items: {
+                incomeItems: payslip.incomeItems || [],
+                deductionItems: payslip.deductionItems || [],
+                leaveData: payslip.leaveData || null,
+                tfr: payslip.tfr || null
+            }
+        };
+
+        if (existingMonthly) {
+            console.log('📝 Aggiornando dati mensili esistenti...');
+            const { error: updateMonthlyError } = await supabase
+                .from('monthly_data')
+                .update({ ...monthlyData, updated_at: new Date().toISOString() })
+                .eq('id', existingMonthly.id);
+
+            if (updateMonthlyError) {
+                console.error('❌ Errore aggiornando dati mensili:', updateMonthlyError);
+                throw updateMonthlyError;
+            }
+            console.log('✅ Dati mensili aggiornati');
+        } else {
+            console.log('➕ Inserendo nuovi dati mensili...');
+            const { error: insertMonthlyError } = await supabase
+                .from('monthly_data')
+                .insert(monthlyData);
+
+            if (insertMonthlyError) {
+                console.error('❌ Errore inserendo dati mensili:', insertMonthlyError);
+                throw insertMonthlyError;
+            }
+            console.log('✅ Dati mensili inseriti');
+        }
 
         console.log('🎉 Busta paga salvata con successo nel Database Storico!');
     } catch (error) {
-        console.error('❌ Errore salvando busta paga in Firestore:', error);
+        console.error('❌ Errore salvando busta paga:', error);
         throw error;
     }
-}
-
-function extractPagaBase(payslip: Payslip): number | null {
-    if (!payslip.remunerationElements || payslip.remunerationElements.length === 0) {
-        return null;
-    }
-
-    const pagaBaseItem = payslip.remunerationElements.find(item =>
-        item.description.toLowerCase().includes('paga base') ||
-        item.description.toLowerCase().includes('retribuzione')
-    );
-
-    return pagaBaseItem ? pagaBaseItem.value : payslip.remunerationElements[0].value;
 }
