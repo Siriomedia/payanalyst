@@ -41,28 +41,56 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
             'Contributi Dipendente',
             'TFR Maturato',
             'Fondo TFR Totale',
+            'Ferie Maturate (ore)',
+            'Ferie Consumate (ore)',
             'Ferie Residuo (ore)',
-            'Permessi Residuo (ore)'
+            'Permessi Maturati (ore)',
+            'Permessi Consumati (ore)',
+            'Permessi Residuo (ore)',
+            'Malattia (ore/gg)',
+            'Ex Festività Residuo (ore)'
         ];
 
-        const rows = payslips.map((payslip) => [
-            payslip.period.year,
-            payslip.period.month,
-            payslip.employee.firstName,
-            payslip.employee.lastName,
-            payslip.company.name,
-            payslip.grossSalary.toFixed(2),
-            payslip.totalDeductions.toFixed(2),
-            payslip.netSalary.toFixed(2),
-            payslip.taxData.taxableBase.toFixed(2),
-            payslip.taxData.netTax.toFixed(2),
-            payslip.socialSecurityData.taxableBase.toFixed(2),
-            payslip.socialSecurityData.employeeContribution.toFixed(2),
-            payslip.tfr.accrued.toFixed(2),
-            payslip.tfr.totalFund.toFixed(2),
-            payslip.leaveData.vacation.balance.toFixed(2),
-            payslip.leaveData.permits.balance.toFixed(2)
-        ]);
+        const rows = payslips.map((payslip) => {
+            const sickLeaveItems = [
+                ...payslip.remunerationElements,
+                ...payslip.incomeItems,
+                ...payslip.deductionItems
+            ].filter(item =>
+                item.description &&
+                (item.description.toLowerCase().includes('malattia') ||
+                 item.description.toLowerCase().includes('assenza'))
+            );
+
+            const sickLeaveHours = sickLeaveItems.reduce((sum, item) => {
+                return sum + (item.quantity || 0);
+            }, 0);
+
+            return [
+                payslip.period.year,
+                payslip.period.month,
+                payslip.employee.firstName,
+                payslip.employee.lastName,
+                payslip.company.name,
+                payslip.grossSalary.toFixed(2),
+                payslip.totalDeductions.toFixed(2),
+                payslip.netSalary.toFixed(2),
+                payslip.taxData.taxableBase.toFixed(2),
+                payslip.taxData.netTax.toFixed(2),
+                payslip.socialSecurityData.taxableBase.toFixed(2),
+                payslip.socialSecurityData.employeeContribution.toFixed(2),
+                payslip.tfr.accrued.toFixed(2),
+                payslip.tfr.totalFund.toFixed(2),
+                payslip.leaveData.vacation.accrued.toFixed(2),
+                payslip.leaveData.vacation.taken.toFixed(2),
+                payslip.leaveData.vacation.balance.toFixed(2),
+                payslip.leaveData.permits.accrued.toFixed(2),
+                payslip.leaveData.permits.taken.toFixed(2),
+                payslip.leaveData.permits.balance.toFixed(2),
+                sickLeaveHours > 0 ? sickLeaveHours.toFixed(2) : '0',
+                payslip.leaveData.exHolidayPermits ? payslip.leaveData.exHolidayPermits.balance.toFixed(2) : 'N/D'
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
