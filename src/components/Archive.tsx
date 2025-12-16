@@ -19,7 +19,75 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
     const [dbPayslips, setDbPayslips] = useState<PayslipData[]>([]);
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingDb, setIsLoadingDb] = useState(false);
-    
+
+    const exportToCSV = () => {
+        if (payslips.length === 0) {
+            alert('Nessuna busta paga da esportare');
+            return;
+        }
+
+        const headers = [
+            'Anno',
+            'Mese',
+            'Nome',
+            'Cognome',
+            'Azienda',
+            'Retribuzione Lorda',
+            'Totale Trattenute',
+            'Netto in Busta',
+            'Imponibile Fiscale',
+            'Imposta Netta',
+            'Imponibile Previdenziale',
+            'Contributi Dipendente',
+            'TFR Maturato',
+            'Fondo TFR Totale',
+            'Ferie Residuo (ore)',
+            'Permessi Residuo (ore)'
+        ];
+
+        const rows = payslips.map((payslip) => [
+            payslip.period.year,
+            payslip.period.month,
+            payslip.employee.firstName,
+            payslip.employee.lastName,
+            payslip.company.name,
+            payslip.grossSalary.toFixed(2),
+            payslip.totalDeductions.toFixed(2),
+            payslip.netSalary.toFixed(2),
+            payslip.taxData.taxableBase.toFixed(2),
+            payslip.taxData.netTax.toFixed(2),
+            payslip.socialSecurityData.taxableBase.toFixed(2),
+            payslip.socialSecurityData.employeeContribution.toFixed(2),
+            payslip.tfr.accrued.toFixed(2),
+            payslip.tfr.totalFund.toFixed(2),
+            payslip.leaveData.vacation.balance.toFixed(2),
+            payslip.leaveData.permits.balance.toFixed(2)
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        const today = new Date();
+        const filename = `buste_paga_${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, '0')}_${String(today.getDate()).padStart(2, '0')}.csv`;
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
+    };
+
     const toggleCompareSelection = (payslipId: string) => {
         setSelectedForCompare(prev => {
             if (prev.includes(payslipId)) {
@@ -83,21 +151,33 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio</h1>
-                {selectedForCompare.length === 2 ? (
-                    <button 
-                        type="button"
-                        onClick={handleCompareClick}
-                        className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
-                    >
-                        <span className="hidden sm:inline">Confronta Selezionati (2/2)</span>
-                        <span className="sm:hidden">Confronta (2/2)</span>
-                    </button>
-                ) : (
-                    <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
-                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/2)</span>
-                        <span className="sm:hidden">Confronta ({selectedForCompare.length}/2)</span>
-                    </span>
-                )}
+                <div className="flex flex-col sm:flex-row gap-2">
+                    {activeTab === 'local' && payslips.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={exportToCSV}
+                            className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-green-600 text-white hover:bg-green-700 cursor-pointer transition-colors whitespace-nowrap"
+                        >
+                            <span className="hidden sm:inline">Esporta CSV</span>
+                            <span className="sm:hidden">CSV</span>
+                        </button>
+                    )}
+                    {selectedForCompare.length === 2 ? (
+                        <button
+                            type="button"
+                            onClick={handleCompareClick}
+                            className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
+                        >
+                            <span className="hidden sm:inline">Confronta Selezionati (2/2)</span>
+                            <span className="sm:hidden">Confronta (2/2)</span>
+                        </button>
+                    ) : (
+                        <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
+                            <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/2)</span>
+                            <span className="sm:hidden">Confronta ({selectedForCompare.length}/2)</span>
+                        </span>
+                    )}
+                </div>
             </div>
 
             {userId && (
