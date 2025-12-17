@@ -1078,7 +1078,7 @@ Codice F00880 "Rimborsi da 730":
         const payslipData = JSON.parse(jsonStr);
 
         if (!payslipData.id) {
-            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
+            payslipData.id = `payslip-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
         }
 
         return payslipData as Payslip;

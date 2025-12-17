@@ -11,7 +11,16 @@ interface ArchiveProps {
 
 const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare, onDeletePayslip }) => {
     const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
-    
+
+    // Debug: controlla ID duplicati
+    React.useEffect(() => {
+        const ids = payslips.map(p => p.id);
+        const uniqueIds = new Set(ids);
+        if (ids.length !== uniqueIds.size) {
+            console.error('⚠️ ID DUPLICATI TROVATI!', ids);
+        }
+    }, [payslips]);
+
     const toggleCompareSelection = (payslipId: string) => {
         setSelectedForCompare(prev => {
             if (prev.includes(payslipId)) {
