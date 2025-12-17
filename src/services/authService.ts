@@ -30,7 +30,7 @@ export async function saveUserData(uid: string, userData: any) {
   }
 }
 
-export async function register(email: string, password: string) {
+export async function register(email: string, password: string, userData?: { firstName?: string; lastName?: string }) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password
@@ -38,6 +38,22 @@ export async function register(email: string, password: string) {
 
   if (error) throw error;
   if (!data.user) throw new Error('Registration failed');
+
+  if (userData) {
+    await supabase
+      .from('users')
+      .upsert({
+        id: data.user.id,
+        email: email,
+        first_name: userData.firstName || '',
+        last_name: userData.lastName || '',
+        role: 'user',
+        plan: 'free',
+        credits: 10,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+  }
 
   return data.user.id;
 }

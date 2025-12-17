@@ -14,29 +14,22 @@ import UpgradeModal from './components/UpgradeModal.tsx';
 import ProfileOnboarding from './components/ProfileOnboarding.tsx';
 import PayrollReference from './components/PayrollReference.tsx';
 
-import { View, Payslip, User, Shift, LeavePlan, Absence, Plan } from './types.ts';
+import { View, Payslip, User, Shift, LeavePlan, Absence } from './types.ts';
 import { PLANS, CREDIT_COSTS } from './config/plans.ts';
-import { normalizeTimestamp } from './utils/timestampHelpers.ts';
-
-// FIREBASE
-import { auth, db } from "./firebase.ts";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc, onSnapshot, increment, updateDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from './supabase.ts';
+import { loadUserData, saveUserData } from './services/authService.ts';
 
 const APP_VERSION = "2.0.0";
 
 const App: React.FC = () => {
-    // VERIFICA VERSIONE APP (senza cancellare dati utente)
     useEffect(() => {
         const storedVersion = localStorage.getItem('app_version');
         if (storedVersion !== APP_VERSION) {
             console.log('Nuova versione rilevata:', APP_VERSION);
             localStorage.setItem('app_version', APP_VERSION);
-            // NON cancelliamo più i dati utente - tutto è in Firestore
         }
     }, []);
 
-    // Ripristina currentView da localStorage
     const [currentView, setCurrentView] = useState<View>(() => {
         try {
             const saved = localStorage.getItem('gioia_currentView');
@@ -46,12 +39,8 @@ const App: React.FC = () => {
         }
     });
 
-    const isUpdatingFromFirestore = useRef(false);
-    const isAtomicCreditUpdate = useRef(false);
+    const isUpdatingFromDatabase = useRef(false);
 
-    //
-    // LOAD USER FROM LOCAL STORAGE
-    //
     const [user, setUser] = useState<User | null>(() => {
         try {
             const item = window.localStorage.getItem('gioia_user');
@@ -76,485 +65,226 @@ const App: React.FC = () => {
         }
     });
 
-    //
-    // FIREBASE AUTH LISTENER + REAL-TIME USER DATA SYNC
-    //
     useEffect(() => {
-        const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
-            if (!fbUser) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT' || !session) {
                 setUser(null);
+                localStorage.removeItem('gioia_user');
                 return;
             }
 
-            // Carica i dati iniziali
-            const ref = doc(db, "users", fbUser.uid);
-            const snap = await getDoc(ref);
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+                const userData = await loadUserData(session.user.id);
 
-            if (snap.exists()) {
-                const data = snap.data();
-
-                const mergedUser: User = {
-                    email: data.email,
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    role: data.role,
-                    dateOfBirth: data.dateOfBirth,
-                    placeOfBirth: data.placeOfBirth,
-                    plan: data.plan,
-                    credits: data.credits ?? 0,
-                    creditResetDate: "", // non serve più
-                    createdAt: normalizeTimestamp(data.createdAt, Date.now()),
-                };
-
-                setUser(mergedUser);
-                window.localStorage.setItem("gioia_user", JSON.stringify(mergedUser));
-            } else {
-                // Documento Firestore non esiste - crealo automaticamente
-                let firstName = "";
-                let lastName = "";
-
-                // Prova a estrarre nome e cognome dal displayName (Google/Apple login)
-                if (fbUser.displayName) {
-                    const nameParts = fbUser.displayName.split(" ");
-                    firstName = nameParts[0] || "";
-                    lastName = nameParts.slice(1).join(" ") || "";
-                }
-
-                const newUserData: User = {
-                    email: fbUser.email || "",
-                    firstName: firstName,
-                    lastName: lastName,
-                    role: 'user',
-                    dateOfBirth: "",
-                    placeOfBirth: "",
-                    plan: 'free',
-                    credits: PLANS.free.credits,
-                    creditResetDate: "",
-                    createdAt: Date.now(), // Fallback se la rilettura fallisce
-                };
-
-                // Salva in Firestore con campo createdAt per ordinamento cronologico
-                await setDoc(ref, {
-                    ...newUserData,
-                    createdAt: serverTimestamp(),
-                }, { merge: true });
-
-                // Rileggi il documento per ottenere il timestamp server-side effettivo
-                const savedSnap = await getDoc(ref);
-                if (savedSnap.exists()) {
-                    const savedData = savedSnap.data();
-                    const completeUserData: User = {
-                        email: savedData.email,
-                        firstName: savedData.firstName,
-                        lastName: savedData.lastName,
-                        role: savedData.role,
-                        dateOfBirth: savedData.dateOfBirth,
-                        placeOfBirth: savedData.placeOfBirth,
-                        plan: savedData.plan,
-                        credits: savedData.credits ?? 0,
-                        creditResetDate: savedData.creditResetDate || "",
-                        createdAt: normalizeTimestamp(savedData.createdAt, Date.now()),
+                if (userData) {
+                    const mergedUser: User = {
+                        email: userData.email || session.user.email || '',
+                        firstName: userData.first_name || '',
+                        lastName: userData.last_name || '',
+                        role: userData.role || 'user',
+                        dateOfBirth: userData.date_of_birth || '',
+                        placeOfBirth: userData.place_of_birth || '',
+                        plan: userData.plan || 'free',
+                        credits: userData.credits ?? 10,
+                        creditResetDate: '',
+                        taxId: userData.tax_id || '',
+                        createdAt: userData.created_at ? new Date(userData.created_at).getTime() : Date.now(),
                     };
-                    setUser(completeUserData);
-                    window.localStorage.setItem("gioia_user", JSON.stringify(completeUserData));
+
+                    setUser(mergedUser);
+                    window.localStorage.setItem("gioia_user", JSON.stringify(mergedUser));
                 } else {
-                    // Fallback se la rilettura fallisce
+                    const newUserData: User = {
+                        email: session.user.email || '',
+                        firstName: '',
+                        lastName: '',
+                        role: 'user',
+                        dateOfBirth: '',
+                        placeOfBirth: '',
+                        plan: 'free',
+                        credits: 10,
+                        creditResetDate: '',
+                        taxId: '',
+                        createdAt: Date.now(),
+                    };
+
+                    await saveUserData(session.user.id, {
+                        email: newUserData.email,
+                        first_name: newUserData.firstName,
+                        last_name: newUserData.lastName,
+                        role: newUserData.role,
+                        plan: newUserData.plan,
+                        credits: newUserData.credits,
+                    });
+
                     setUser(newUserData);
                     window.localStorage.setItem("gioia_user", JSON.stringify(newUserData));
                 }
             }
         });
 
-        return () => unsubAuth();
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
-    //
-    // REAL-TIME FIRESTORE LISTENER FOR USER DATA (crediti aggiornati da admin)
-    //
     useEffect(() => {
-        if (!auth.currentUser) return;
+        if (!user || isUpdatingFromDatabase.current) return;
 
-        const userRef = doc(db, "users", auth.currentUser.uid);
-        const unsubFirestore = onSnapshot(userRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.data();
-                
-                // Merge completo: spread tutti i campi esistenti e sovrascrivi con Firestore
-                setUser(prevUser => {
-                    const updatedUser: User = {
-                        ...(prevUser || {}),  // Preserva campi esistenti, gestisce caso null
-                        ...data,              // Sovrascrivi con dati da Firestore
-                        credits: data.credits ?? (prevUser?.credits || 0),
-                        creditResetDate: data.creditResetDate || (prevUser?.creditResetDate || ''),
-                        createdAt: normalizeTimestamp(data.createdAt, prevUser?.createdAt || Date.now()),
-                    } as User;
+        const saveData = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
 
-                    // Imposta il flag per evitare loop infinito
-                    isUpdatingFromFirestore.current = true;
-                    window.localStorage.setItem("gioia_user", JSON.stringify(updatedUser));
-                    
-                    return updatedUser;
-                });
-            }
-        }, (error) => {
-            console.error('Errore nel listener Firestore utente:', error);
-        });
+            const { createdAt, creditResetDate, ...userDataToSave } = user;
 
-        return () => unsubFirestore();
-    }, [auth.currentUser?.uid]);
+            await saveUserData(session.user.id, {
+                email: userDataToSave.email,
+                first_name: userDataToSave.firstName,
+                last_name: userDataToSave.lastName,
+                role: userDataToSave.role,
+                date_of_birth: userDataToSave.dateOfBirth,
+                place_of_birth: userDataToSave.placeOfBirth,
+                plan: userDataToSave.plan,
+                credits: userDataToSave.credits,
+                tax_id: userDataToSave.taxId,
+            });
 
-    //
-    // SAVE USER (LOCALSTORAGE + FIRESTORE)
-    //
-    useEffect(() => {
-        if (!user) {
-            window.localStorage.removeItem("gioia_user");
-            return;
-        }
-
-        window.localStorage.setItem("gioia_user", JSON.stringify(user));
-
-        // Se l'aggiornamento viene dal listener Firestore, non salvare di nuovo
-        if (isUpdatingFromFirestore.current) {
-            isUpdatingFromFirestore.current = false;
-            return;
-        }
-
-        // Se i crediti sono stati aggiornati atomicamente, non sovrascrivere
-        if (isAtomicCreditUpdate.current) {
-            isAtomicCreditUpdate.current = false;
-            return;
-        }
-
-        const saveToFirestore = async () => {
-            if (!auth.currentUser) return;
-            const ref = doc(db, "users", auth.currentUser.uid);
-            
-            // Rimuovi createdAt dallo stato locale prima di salvare per non sovrascriverlo
-            const { createdAt, ...userDataToSave } = user as any;
-            await setDoc(ref, userDataToSave, { merge: true });
+            window.localStorage.setItem("gioia_user", JSON.stringify(user));
         };
 
-        saveToFirestore().catch(console.error);
+        saveData();
     }, [user]);
 
-    //
-    // LOCAL DATA
-    //
     const [payslips, setPayslips] = useState<Payslip[]>(() => {
-        try { return JSON.parse(localStorage.getItem("gioia_payslips") || "[]"); }
-        catch { return []; }
+        const stored = localStorage.getItem('gioia_payslips');
+        return stored ? JSON.parse(stored) : [];
     });
 
     const [shifts, setShifts] = useState<Shift[]>(() => {
-        try { return JSON.parse(localStorage.getItem("gioia_shifts") || "[]"); }
-        catch { return []; }
+        const stored = localStorage.getItem('gioia_shifts');
+        return stored ? JSON.parse(stored) : [];
     });
 
     const [leavePlans, setLeavePlans] = useState<LeavePlan[]>(() => {
-        try { return JSON.parse(localStorage.getItem("gioia_leave_plans") || "[]"); }
-        catch { return []; }
+        const stored = localStorage.getItem('gioia_leavePlans');
+        return stored ? JSON.parse(stored) : [];
     });
 
     const [absences, setAbsences] = useState<Absence[]>(() => {
-        try { return JSON.parse(localStorage.getItem("gioia_absences") || "[]"); }
-        catch { return []; }
+        const stored = localStorage.getItem('gioia_absences');
+        return stored ? JSON.parse(stored) : [];
     });
 
-    // Ripristina selectedPayslip da localStorage
     const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(() => {
         try {
             const saved = localStorage.getItem('gioia_selectedPayslip');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                return parsed as Payslip;
+                return parsed;
             }
-        } catch {
-            // Ignore
-        }
-        return payslips.length > 0 ? payslips[0] : null;
+        } catch {}
+        return null;
     });
 
     const [alert, setAlert] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [databaseContext, setDatabaseContext] = useState<string | null>(null);
 
-    //
-    // PERSIST LOCAL DATA TO LOCALSTORAGE
-    //
-    useEffect(() => {
-        localStorage.setItem("gioia_payslips", JSON.stringify(payslips));
-    }, [payslips]);
-
-    useEffect(() => {
-        localStorage.setItem("gioia_shifts", JSON.stringify(shifts));
-    }, [shifts]);
-
-    useEffect(() => {
-        localStorage.setItem("gioia_leave_plans", JSON.stringify(leavePlans));
-    }, [leavePlans]);
-
-    useEffect(() => {
-        localStorage.setItem("gioia_absences", JSON.stringify(absences));
-    }, [absences]);
-
-    // Persist currentView to localStorage
     useEffect(() => {
         localStorage.setItem('gioia_currentView', currentView);
     }, [currentView]);
 
-    // Persist selectedPayslip to localStorage
+    useEffect(() => {
+        localStorage.setItem('gioia_payslips', JSON.stringify(payslips));
+    }, [payslips]);
+
+    useEffect(() => {
+        localStorage.setItem('gioia_shifts', JSON.stringify(shifts));
+    }, [shifts]);
+
+    useEffect(() => {
+        localStorage.setItem('gioia_leavePlans', JSON.stringify(leavePlans));
+    }, [leavePlans]);
+
+    useEffect(() => {
+        localStorage.setItem('gioia_absences', JSON.stringify(absences));
+    }, [absences]);
+
     useEffect(() => {
         if (selectedPayslip) {
             localStorage.setItem('gioia_selectedPayslip', JSON.stringify(selectedPayslip));
         }
     }, [selectedPayslip]);
 
-    //
-    // REMOVE MONTHLY RESET (PIANO A)
-    // → Nessun reset. Nessun credito gratis.
-    //
+    const handleCreditConsumption = async (cost: number): boolean => {
+        if (!user) return false;
 
-    //
-    // CREDIT USAGE — ADMIN HAVE INFINITE CREDITS
-    //
-    const handleCreditConsumption = (cost: number): boolean => {
-        if (!user) {
-            setShowUpgradeModal(true);
-            return false;
-        }
-
-        // Admin hanno crediti infiniti
-        if (user.role === 'admin') {
-            return true;
-        }
-
-        // Utenti normali: controllo crediti
         if (user.credits < cost) {
             setShowUpgradeModal(true);
             return false;
         }
 
-        // Usa increment atomico per evitare race conditions con admin gifts
-        if (auth.currentUser) {
-            const userRef = doc(db, "users", auth.currentUser.uid);
-            updateDoc(userRef, { credits: increment(-cost) }).catch(console.error);
-            
-            // Imposta flag per evitare che useEffect riscriva su Firestore
-            isAtomicCreditUpdate.current = true;
+        const updatedUser = { ...user, credits: user.credits - cost };
+        setUser(updatedUser);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            await supabase
+                .from('users')
+                .update({ credits: updatedUser.credits })
+                .eq('id', session.user.id);
         }
-        
-        // Aggiorna anche lo stato locale per UI reattiva (verrà sincronizzato dal listener)
-        setUser(prev => prev ? { ...prev, credits: prev.credits - cost } : null);
+
         return true;
     };
 
-    //
-    // CHANGE PLAN — NO FREE CREDITS
-    //
-    const handlePlanChange = (newPlan: Plan) => {
-        setUser(prev => {
-            if (!prev) return null;
+    const handleAnalysisComplete = (payslip: Payslip) => {
+        const existingIndex = payslips.findIndex(
+            (p) => p.period.year === payslip.period.year && p.period.month === payslip.period.month
+        );
 
-            return {
-                ...prev,
-                plan: newPlan
-                // NO crediti aggiunti
-            };
-        });
-
-        setCurrentView(View.Dashboard);
-    };
-
-    //
-    // ADD CREDITS (PAYPAL)
-    //
-    const handleAddCredits = (amount: number) => {
-        setUser(prev => {
-            if (!prev) return null;
-            return { ...prev, credits: prev.credits + amount };
-        });
-    };
-
-    //
-    // ANALYSIS COMPLETE - VERIFICA CORRISPONDENZA DATI ANAGRAFICI
-    //
-    const handleAnalysisComplete = (newPayslip: Payslip) => {
-        console.log('======================================');
-        console.log('CHIAMATA handleAnalysisComplete');
-        console.log('Busta paga - Nome:', newPayslip.employee.firstName, 'Cognome:', newPayslip.employee.lastName);
-        console.log('Profilo utente - Nome:', user?.firstName, 'Cognome:', user?.lastName);
-        console.log('Utente è admin?', user?.role === 'admin');
-        console.log('======================================');
-
-        setSelectedPayslip(newPayslip);
-
-        // Admin bypassa tutti i controlli
-        if (user && user.role === "admin") {
-            console.log('🔑 UTENTE ADMIN: Bypassa controlli e salva sempre');
-            const updated = [...payslips, newPayslip].sort((a, b) => {
-                const dA = new Date(a.period.year, a.period.month - 1);
-                const dB = new Date(b.period.year, b.period.month - 1);
-                return dB.getTime() - dA.getTime();
-            });
-            setPayslips(updated);
-            console.log('✅ Admin: Busta paga salvata. Archivio contiene', updated.length, 'buste paga');
-            setAlert(null);
-            setCurrentView(View.Dashboard);
-            return;
-        }
-
-        // Controllo completo dei dati anagrafici
-        if (!user) {
-            setAlert("⚠️ Errore: Nessun utente autenticato.");
-            setCurrentView(View.Dashboard);
-            return;
-        }
-
-        // Funzione per normalizzare le date (supporta vari formati italiani e internazionali)
-        const normalizeDate = (dateStr: string | undefined): string => {
-            if (!dateStr) return "";
-            const cleaned = dateStr.trim().replace(/\s+/g, '');
-            
-            // Prova a parsare diversi formati
-            const patterns = [
-                /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,  // D/M/YYYY o DD/MM/YYYY
-                /^(\d{1,2})-(\d{1,2})-(\d{4})$/,    // D-M-YYYY o DD-MM-YYYY
-                /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,  // D.M.YYYY o DD.MM.YYYY
-                /^(\d{4})-(\d{1,2})-(\d{1,2})$/,    // YYYY-M-D o YYYY-MM-DD
-                /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/,  // YYYY/M/D o YYYY/MM/DD
-                /^(\d{4})\.(\d{1,2})\.(\d{1,2})$/,  // YYYY.M.D o YYYY.MM.DD
-            ];
-
-            for (const pattern of patterns) {
-                const match = cleaned.match(pattern);
-                if (match) {
-                    let day: string, month: string, year: string;
-                    
-                    // Se è YYYY-M-D (anno all'inizio)
-                    if (match[1].length === 4) {
-                        year = match[1];
-                        month = match[2].padStart(2, '0');
-                        day = match[3].padStart(2, '0');
-                    } else {
-                        // Se è D-M-YYYY (giorno all'inizio)
-                        day = match[1].padStart(2, '0');
-                        month = match[2].padStart(2, '0');
-                        year = match[3];
-                    }
-                    
-                    return `${day}/${month}/${year}`; // Normalizza in DD/MM/YYYY
-                }
-            }
-            
-            return cleaned; // Ritorna come è se non riconosciuto
-        };
-
-        // Funzione per normalizzare i luoghi e nomi (case-insensitive, trim, rimuovi spazi multipli, preserva apostrofi)
-        const normalizePlace = (place: string | undefined): string => {
-            if (!place) return "";
-            return place.trim().toLowerCase()
-                .replace(/\s+/g, ' ')  // Normalizza spazi multipli
-                .replace(/'/g, "'")    // Normalizza apostrofi (smart quote → standard)
-                .replace(/'/g, "'")    // Normalizza altri apostrofi
-                .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Rimuovi accenti per confronto uniforme
-        };
-
-        // Verifica che nome e cognome siano presenti nel profilo
-        const userProfileComplete =
-            user.firstName && user.firstName.trim() !== "" &&
-            user.lastName && user.lastName.trim() !== "";
-
-        if (!userProfileComplete) {
-            setAlert(
-                `⚠️ PROFILO INCOMPLETO - IMPOSSIBILE SALVARE\n\n` +
-                `Per salvare le buste paga nell'archivio, devi completare il tuo profilo in Impostazioni con:\n\n` +
-                `• Nome\n` +
-                `• Cognome\n\n` +
-                `📌 Puoi visualizzare l'analisi temporanea, ma non verrà salvata nell'archivio.\n` +
-                `💡 Vai in Impostazioni e completa i tuoi dati anagrafici.`
-            );
-            setCurrentView(View.Dashboard);
-            return;
-        }
-
-        // Verifica che nome e cognome siano presenti nella busta paga
-        const payslipDataComplete =
-            newPayslip.employee.firstName && newPayslip.employee.firstName.trim() !== "" &&
-            newPayslip.employee.lastName && newPayslip.employee.lastName.trim() !== "";
-
-        if (!payslipDataComplete) {
-            setAlert(
-                `⚠️ DATI INCOMPLETI NELLA BUSTA PAGA\n\n` +
-                `La busta paga non contiene nome e cognome del dipendente.\n\n` +
-                `📌 Puoi visualizzare l'analisi temporanea, ma non verrà salvata nell'archivio.\n` +
-                `💡 Assicurati che la busta paga sia leggibile e contenga tutti i dati.`
-            );
-            setCurrentView(View.Dashboard);
-            return;
-        }
-
-        // Confronto normalizzato di nome e cognome
-        const firstNameMatch = normalizePlace(newPayslip.employee.firstName) === normalizePlace(user.firstName);
-        const lastNameMatch = normalizePlace(newPayslip.employee.lastName) === normalizePlace(user.lastName);
-
-        const nameMatches = firstNameMatch && lastNameMatch;
-
-        console.log('=== CONFRONTO DATI ANAGRAFICI ===');
-        console.log('Busta paga - Nome:', newPayslip.employee.firstName, '→ Normalizzato:', normalizePlace(newPayslip.employee.firstName));
-        console.log('Profilo - Nome:', user.firstName, '→ Normalizzato:', normalizePlace(user.firstName));
-        console.log('Nome corrisponde?', firstNameMatch);
-        console.log('Busta paga - Cognome:', newPayslip.employee.lastName, '→ Normalizzato:', normalizePlace(newPayslip.employee.lastName));
-        console.log('Profilo - Cognome:', user.lastName, '→ Normalizzato:', normalizePlace(user.lastName));
-        console.log('Cognome corrisponde?', lastNameMatch);
-        console.log('Risultato finale - Salva in archivio?', nameMatches);
-
-        if (nameMatches) {
-            // DATI CORRISPONDENTI → Salva busta paga
-            console.log('✅ SALVATAGGIO IN ARCHIVIO: Nome e cognome corrispondono');
-            const updated = [...payslips, newPayslip].sort((a, b) => {
-                const dA = new Date(a.period.year, a.period.month - 1);
-                const dB = new Date(b.period.year, b.period.month - 1);
-                return dB.getTime() - dA.getTime();
-            });
-            setPayslips(updated);
-            console.log('✅ Busta paga salvata. Archivio ora contiene', updated.length, 'buste paga');
-            setAlert(null);
+        let updatedPayslips: Payslip[];
+        if (existingIndex !== -1) {
+            updatedPayslips = [...payslips];
+            updatedPayslips[existingIndex] = payslip;
         } else {
-            // DATI NON CORRISPONDENTI → Solo analisi temporanea, NON salvare
-            console.log('❌ NON SALVATO: Nome e/o cognome NON corrispondono');
-            console.log('❌ La busta paga NON viene aggiunta all\'archivio');
-            setAlert(
-                `⚠️ ATTENZIONE: DATI NON CORRISPONDENTI\n\n` +
-                `I dati di questa busta paga NON corrispondono all'utente registrato:\n\n` +
-                `• Nome sulla busta paga: "${newPayslip.employee.firstName}"\n` +
-                `• Nome nel tuo profilo: "${user.firstName}"\n\n` +
-                `• Cognome sulla busta paga: "${newPayslip.employee.lastName}"\n` +
-                `• Cognome nel tuo profilo: "${user.lastName}"\n\n` +
-                `✅ Puoi visualizzare l'analisi della busta paga\n` +
-                `❌ I dati NON verranno salvati nell'archivio\n\n` +
-                `💡 Se questa è la tua busta paga, aggiorna i tuoi dati in Impostazioni.`
-            );
+            updatedPayslips = [...payslips, payslip];
         }
 
+        setPayslips(updatedPayslips);
+        setSelectedPayslip(payslip);
+        setAlert('Analisi completata con successo');
         setCurrentView(View.Dashboard);
     };
 
-    //
-    // DELETE PAYSLIP FROM ARCHIVE
-    //
     const handleDeletePayslip = (payslipId: string) => {
-        setPayslips(prev => {
-            const updated = prev.filter(p => p.id !== payslipId);
-            return updated;
+        const updatedPayslips = payslips.filter((p) => {
+            const id = `${p.period.year}-${p.period.month}`;
+            return id !== payslipId;
         });
+
+        setPayslips(updatedPayslips);
+
+        if (selectedPayslip) {
+            const currentId = `${selectedPayslip.period.year}-${selectedPayslip.period.month}`;
+            if (currentId === payslipId) {
+                setSelectedPayslip(null);
+            }
+        }
+
+        setAlert('Busta paga eliminata');
     };
 
-    //
-    // HANDLE ONBOARDING COMPLETE
-    //
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setPayslips([]);
+        setSelectedPayslip(null);
+        localStorage.clear();
+    };
+
     const handleOnboardingComplete = async (updatedData: { firstName: string; lastName: string; dateOfBirth: string; placeOfBirth: string }) => {
-        if (!user || !auth.currentUser) return;
+        if (!user) return;
 
         const updatedUser: User = {
             ...user,
@@ -563,42 +293,46 @@ const App: React.FC = () => {
 
         setUser(updatedUser);
 
-        const userRef = doc(db, "users", auth.currentUser.uid);
-        await setDoc(userRef, updatedData, { merge: true });
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            await saveUserData(session.user.id, {
+                first_name: updatedData.firstName,
+                last_name: updatedData.lastName,
+                date_of_birth: updatedData.dateOfBirth,
+                place_of_birth: updatedData.placeOfBirth,
+            });
+        }
     };
 
-    //
-    // LOGOUT
-    //
-    const handleLogout = async () => {
-        await signOut(auth);
+    const needsProfileSetup = user && (!user.firstName || !user.lastName || !user.dateOfBirth || !user.placeOfBirth);
 
-        localStorage.clear();
-        setUser(null);
-        setPayslips([]);
-        setShifts([]);
-        setLeavePlans([]);
-        setAbsences([]);
-        setSelectedPayslip(null);
-        setAlert(null);
-        setCurrentView(View.Dashboard);
-    };
-
-    //
-    // RENDER
-    //
-    if (!user) return <Login onLoginSuccess={setUser} />;
-
-    const isProfileComplete = user.dateOfBirth && user.dateOfBirth.trim() !== '' &&
-                              user.placeOfBirth && user.placeOfBirth.trim() !== '';
-
-    if (!isProfileComplete) {
-        return <ProfileOnboarding user={user} onComplete={handleOnboardingComplete} />;
+    if (!user) {
+        return <Login onLoginSuccess={() => {}} />;
     }
 
+    if (needsProfileSetup && currentView !== View.Settings) {
+        return (
+            <ProfileOnboarding
+                user={user}
+                onComplete={handleOnboardingComplete}
+                onSkip={() => setCurrentView(View.Dashboard)}
+            />
+        );
+    }
+
+    const getCurrentUserId = async (): Promise<string | undefined> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        return session?.user?.id;
+    };
+
     return (
-        <>
-            <Layout user={user} currentView={currentView} setCurrentView={setCurrentView} onLogout={handleLogout}>
+        <div className="min-h-screen bg-gray-50">
+            <Layout
+                onNavigate={setCurrentView}
+                currentView={currentView}
+                user={user}
+                onLogout={handleLogout}
+            >
                 {(() => {
                     switch (currentView) {
                         case View.Dashboard:
@@ -608,7 +342,7 @@ const App: React.FC = () => {
                                     alert={alert}
                                     payslips={payslips}
                                     handleCreditConsumption={handleCreditConsumption}
-                                    userId={auth.currentUser?.uid}
+                                    userId={(async () => await getCurrentUserId())() as any}
                                 />
                             );
                         case View.Upload:
@@ -628,7 +362,7 @@ const App: React.FC = () => {
                                         setCurrentView(View.Dashboard);
                                     }}
                                     onDeletePayslip={handleDeletePayslip}
-                                    userId={auth.currentUser?.uid}
+                                    userId={(async () => await getCurrentUserId())() as any}
                                     onAnalyzeWithAssistant={(csvData) => {
                                         setDatabaseContext(csvData);
                                         setCurrentView(View.Assistant);
@@ -641,7 +375,7 @@ const App: React.FC = () => {
                                     payslips={payslips}
                                     mode="general"
                                     handleCreditConsumption={handleCreditConsumption}
-                                    userId={auth.currentUser?.uid}
+                                    userId={(async () => await getCurrentUserId())() as any}
                                     externalDatabaseContext={databaseContext}
                                     onClearDatabaseContext={() => setDatabaseContext(null)}
                                 />
@@ -649,22 +383,21 @@ const App: React.FC = () => {
                         case View.AdminPanel:
                             return user.role === "admin"
                                 ? <AdminPanel user={user} />
-                                : <Dashboard payslip={selectedPayslip} alert={alert} payslips={payslips} handleCreditConsumption={handleCreditConsumption} userId={auth.currentUser?.uid} />;
+                                : <Dashboard payslip={selectedPayslip} alert={alert} payslips={payslips} handleCreditConsumption={handleCreditConsumption} userId={(async () => await getCurrentUserId())() as any} />;
                         case View.ShiftPlanner:
                             return <ShiftPlanner shifts={shifts} onSave={() => {}} onDelete={() => {}} absences={absences} onSaveAbsence={() => {}} onDeleteAbsence={() => {}} />;
                         case View.LeavePlanner:
-                            return <LeavePlanner leavePlans={leavePlans} onSave={() => {}} onDelete={() => {}} />;
-                        case View.Subscription:
                             return (
-                                <Subscription
-                                    user={user}
-                                    onPlanChange={handlePlanChange}
-                                    onAddCredits={handleAddCredits}
+                                <LeavePlanner
+                                    leavePlans={leavePlans}
+                                    onSave={() => {}}
+                                    onDelete={() => {}}
                                 />
                             );
                         case View.Settings:
                             return <Settings user={user} onSave={async (updatedData) => {
-                                if (!auth.currentUser) return;
+                                const { data: { session } } = await supabase.auth.getSession();
+                                if (!session) return;
 
                                 const updatedUser: User = {
                                     ...user,
@@ -673,11 +406,18 @@ const App: React.FC = () => {
 
                                 setUser(updatedUser);
 
-                                const userRef = doc(db, "users", auth.currentUser.uid);
-                                await setDoc(userRef, updatedData, { merge: true });
+                                await saveUserData(session.user.id, {
+                                    first_name: updatedData.firstName,
+                                    last_name: updatedData.lastName,
+                                    date_of_birth: updatedData.dateOfBirth,
+                                    place_of_birth: updatedData.placeOfBirth,
+                                    tax_id: updatedData.taxId,
+                                });
                             }} onPasswordChange={() => Promise.resolve()} />;
                         case View.PayrollReference:
                             return <PayrollReference />;
+                        case View.Subscription:
+                            return <Subscription user={user} onPlanChange={(newPlan) => setUser({ ...user, plan: newPlan })} />;
                         default:
                             return null;
                     }
@@ -691,9 +431,10 @@ const App: React.FC = () => {
                         setShowUpgradeModal(false);
                         setCurrentView(View.Subscription);
                     }}
+                    userPlan={user.plan}
                 />
             )}
-        </>
+        </div>
     );
 };
 
