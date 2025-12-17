@@ -139,6 +139,8 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
         document.body.removeChild(link);
 
         URL.revokeObjectURL(url);
+
+        setActiveTab('database');
     };
 
     const exportDatabaseToCSV = () => {
