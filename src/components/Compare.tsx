@@ -149,9 +149,14 @@ const Compare: React.FC<CompareProps> = ({ payslips }) => {
 
                             <tr className="bg-gray-50">
                                 <td colSpan={payslips.length + 1} className="py-1.5 sm:py-2 px-2 sm:px-4 font-bold text-gray-500 text-xs sm:text-sm sticky left-0 z-10">
-                                    Ferie & Permessi
+                                    Ferie, Permessi & Assenze
                                 </td>
                             </tr>
+                            <ComparisonRow label="Ferie Usufruite" values={payslips.map(p => p.leaveData.vacation.taken)} isCurrency={false} />
+                            <ComparisonRow label="Permessi Usufruiti" values={payslips.map(p => p.leaveData.permits.taken)} isCurrency={false} />
+                            {payslips.some(p => p.leaveData.sickLeave) && (
+                                <ComparisonRow label="Malattia" values={payslips.map(p => p.leaveData.sickLeave?.taken || 0)} isCurrency={false} />
+                            )}
                             <ComparisonRow label="Saldo Ferie" values={payslips.map(p => p.leaveData.vacation.balance)} isCurrency={false} />
                             <ComparisonRow label="Saldo Permessi" values={payslips.map(p => p.leaveData.permits.balance)} isCurrency={false} />
                         </tbody>

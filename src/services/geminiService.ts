@@ -745,6 +745,13 @@ const payslipSchema = {
                 vacation: { ...leaveBalanceSchema, description: "Dettaglio Ferie (tutti i valori in ORE, non giorni)." },
                 permits: { ...leaveBalanceSchema, description: "Dettaglio Permessi/ROL (tutti i valori in ORE, non giorni)." },
                 exHolidayPermits: { ...leaveBalanceSchema, description: "Dettaglio Permessi Ex Festività (tutti i valori in ORE, non giorni). Cerca 'Ex Fest', 'Ex Festività', 'Festività Abolite' o simili." },
+                sickLeave: {
+                    type: Type.OBJECT,
+                    properties: {
+                        taken: { type: Type.NUMBER, description: "Ore o giorni di malattia usufruiti nel periodo corrente. Cerca nella sezione 'Assenze' o tra le voci variabili per 'Malattia' o simili. Se non presente, omettere completamente questo oggetto." }
+                    },
+                    description: "Dettaglio malattia (se presente nella busta paga)."
+                },
             },
             required: ['vacation', 'permits']
         },
@@ -1009,12 +1016,13 @@ Codice F00880 "Rimborsi da 730":
 • Inserisci eventualmente queste informazioni nel contesto fiscale se servono, ma NON devono alterare i totali del mese.
 
 ────────────────────────────────────
-5) DATI FISCALI, PREVIDENZIALI, TFR, FERIE
+5) DATI FISCALI, PREVIDENZIALI, TFR, FERIE E ASSENZE
 ────────────────────────────────────
 • "taxData": leggi i valori SOLO dai riquadri riepilogativi in basso (ZONA 3), NON dalla tabella centrale:
   - Imponibile Fiscale, Imposta Lorda, Detrazioni Lavoro Dipendente, Detrazioni Totali, Imposta Netta, Addizionali.
 • "socialSecurityData": usa i box riepilogativi per Imponibile INPS e contributi; se non c'è un quadro dedicato, puoi usare la somma delle voci contributive delle trattenute.
 • "tfr" e "leaveData": leggi le apposite tabelle (Imponibile TFR, Quota maturata, Fondo precedente/totale, Ferie/ROL con saldo precedente, maturato, goduto, saldo).
+• "sickLeave" (malattia): se presente nella sezione "Assenze" o "Ratei" o tra le voci variabili (es. "Malattia", "Assenza malattia"), estrai il numero di ore/giorni usufruiti nel periodo. Se non presente, ometti completamente questo campo.
 
 ────────────────────────────────────
 6) COERENZA MATEMATICA

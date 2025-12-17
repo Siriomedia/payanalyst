@@ -102,6 +102,9 @@ export interface Payslip {
         vacation: LeaveBalance; // Ferie (in ORE)
         permits: LeaveBalance; // Permessi/ROL (in ORE)
         exHolidayPermits?: LeaveBalance; // Permessi Ex Festività (in ORE)
+        sickLeave?: {
+            taken: number; // Ore/giorni di malattia usufruiti nel periodo
+        };
     };
 }
 
