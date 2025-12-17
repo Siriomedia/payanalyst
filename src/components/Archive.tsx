@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Payslip } from '../types.ts';
 import { EuroIcon, TrashIcon } from './common/Icons.tsx';
-import { getUserMonthlyData, getUserPayslipsForArchive, calculateUserStatistics, MonthlyData, PayslipData } from '../services/payslipService.ts';
+import { getUserMonthlyData, getUserPayslipsForArchive, calculateUserStatistics, MonthlyData, PayslipData, importCSVToDatabase } from '../services/payslipService.ts';
 import Spinner from './common/Spinner.tsx';
 
 interface ArchiveProps {
@@ -31,7 +31,9 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
     const [dbPayslips, setDbPayslips] = useState<PayslipData[]>([]);
     const [statistics, setStatistics] = useState<any>(null);
     const [isLoadingDb, setIsLoadingDb] = useState(false);
+    const [isUploadingCSV, setIsUploadingCSV] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [filters, setFilters] = useState<Filters>({
         year: '',
         month: '',
@@ -205,6 +207,33 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
 
         const csvData = [headers.join(','), ...rows].join('\n');
         onAnalyzeWithAssistant(csvData);
+    };
+
+    const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !userId) return;
+
+        setIsUploadingCSV(true);
+        try {
+            const text = await file.text();
+            const result = await importCSVToDatabase(userId, text);
+
+            if (result.errors.length > 0) {
+                alert(`Caricamento completato con ${result.success} righe importate.\n\nErrori:\n${result.errors.join('\n')}`);
+            } else {
+                alert(`CSV caricato con successo! ${result.success} righe importate.`);
+            }
+
+            await loadDatabaseData();
+        } catch (error) {
+            console.error('Errore caricamento CSV:', error);
+            alert('Errore durante il caricamento del CSV: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+        } finally {
+            setIsUploadingCSV(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
     };
 
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
@@ -425,6 +454,20 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                                                 <p className="text-sm text-gray-600 mt-1">Dati estratti e elaborati dalle Cloud Functions</p>
                                             </div>
                                             <div className="flex gap-2">
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept=".csv"
+                                                    onChange={handleCSVUpload}
+                                                    className="hidden"
+                                                />
+                                                <button
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    disabled={isUploadingCSV}
+                                                    className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isUploadingCSV ? 'Caricamento...' : 'Carica CSV'}
+                                                </button>
                                                 <button
                                                     onClick={exportDatabaseToCSV}
                                                     className="px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold text-sm whitespace-nowrap"
@@ -650,16 +693,38 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                                     <div className="text-center">
                                         <h3 className="text-lg font-bold text-blue-900 mb-3">Database Storico Vuoto</h3>
                                         <p className="text-blue-800 mb-4">
-                                            Il Database Storico si popola automaticamente quando carichi buste paga tramite le Cloud Functions.
+                                            Puoi popolare il Database Storico in due modi:
                                         </p>
-                                        <div className="bg-white rounded-lg p-4 mb-4 text-left">
-                                            <p className="font-semibold text-blue-900 mb-2">Come funziona:</p>
-                                            <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
-                                                <li>Vai su "Carica Busta Paga"</li>
-                                                <li>Carica il PDF della tua busta paga</li>
-                                                <li>Le Cloud Functions elaborano il documento</li>
-                                                <li>I dati vengono salvati nel Database Storico</li>
-                                            </ol>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            <div className="bg-white rounded-lg p-4 text-left">
+                                                <p className="font-semibold text-blue-900 mb-2">1. Carica un file CSV</p>
+                                                <p className="text-sm text-blue-800 mb-3">
+                                                    Se hai già esportato le tue buste paga, carica il file CSV per importarle nel database.
+                                                </p>
+                                                <input
+                                                    ref={fileInputRef}
+                                                    type="file"
+                                                    accept=".csv"
+                                                    onChange={handleCSVUpload}
+                                                    className="hidden"
+                                                />
+                                                <button
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    disabled={isUploadingCSV}
+                                                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    {isUploadingCSV ? 'Caricamento...' : 'Carica CSV'}
+                                                </button>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-4 text-left">
+                                                <p className="font-semibold text-blue-900 mb-2">2. Carica PDF con Cloud Functions</p>
+                                                <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                                                    <li>Vai su "Carica Busta Paga"</li>
+                                                    <li>Carica il PDF della tua busta paga</li>
+                                                    <li>Le Cloud Functions elaborano il documento</li>
+                                                    <li>I dati vengono salvati automaticamente</li>
+                                                </ol>
+                                            </div>
                                         </div>
                                         <p className="text-xs text-blue-600">
                                             💡 I dati elaborati dalle Cloud Functions sono più dettagliati e permettono analisi avanzate con l'AI

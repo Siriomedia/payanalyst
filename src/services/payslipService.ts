@@ -289,3 +289,127 @@ export async function calculateUserStatistics(userId: string): Promise<{
         };
     }
 }
+
+export async function importCSVToDatabase(userId: string, csvContent: string): Promise<{ success: number; errors: string[] }> {
+    const lines = csvContent.split('\n').filter(line => line.trim());
+
+    if (lines.length < 2) {
+        throw new Error('CSV vuoto o non valido');
+    }
+
+    const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        result.push(current.trim());
+        return result;
+    };
+
+    const headers = parseCSVLine(lines[0]);
+    const results = { success: 0, errors: [] as string[] };
+
+    for (let i = 1; i < lines.length; i++) {
+        try {
+            const values = parseCSVLine(lines[i]);
+
+            const parseNumber = (val: string): number => {
+                if (!val || val === 'N/D') return 0;
+                return parseFloat(val.replace(',', '.')) || 0;
+            };
+
+            const year = parseInt(values[0]) || 0;
+            const month = parseInt(values[1]) || 0;
+            const grossSalary = parseNumber(values[5]);
+            const totalDeductions = parseNumber(values[6]);
+            const netSalary = parseNumber(values[7]);
+            const tfrAccrued = parseNumber(values[12]);
+            const tfrTotal = parseNumber(values[13]);
+            const vacationAccrued = parseNumber(values[14]);
+            const vacationTaken = parseNumber(values[15]);
+            const vacationBalance = parseNumber(values[16]);
+            const permitsAccrued = parseNumber(values[17]);
+            const permitsTaken = parseNumber(values[18]);
+            const permitsBalance = parseNumber(values[19]);
+            const sickLeave = parseNumber(values[20]);
+            const exHolidays = parseNumber(values[21]);
+
+            const items = {
+                leaveData: {
+                    vacation: {
+                        accrued: vacationAccrued,
+                        used: vacationTaken,
+                        balance: vacationBalance
+                    },
+                    permits: {
+                        accrued: permitsAccrued,
+                        used: permitsTaken,
+                        balance: permitsBalance
+                    },
+                    sickLeave: sickLeave,
+                    exHolidays: exHolidays
+                },
+                tfr: {
+                    accrued: tfrAccrued,
+                    totalFund: tfrTotal
+                }
+            };
+
+            const { data: existing } = await supabase
+                .from('monthly_data')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('year', year)
+                .eq('month', month)
+                .maybeSingle();
+
+            if (existing) {
+                const { error } = await supabase
+                    .from('monthly_data')
+                    .update({
+                        net_salary: netSalary,
+                        gross_salary: grossSalary,
+                        total_deductions: totalDeductions,
+                        items: items,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('monthly_data')
+                    .insert({
+                        user_id: userId,
+                        year: year,
+                        month: month,
+                        net_salary: netSalary,
+                        gross_salary: grossSalary,
+                        total_deductions: totalDeductions,
+                        items: items
+                    });
+
+                if (error) throw error;
+            }
+
+            results.success++;
+        } catch (error) {
+            console.error(`❌ Errore riga ${i + 1}:`, error);
+            results.errors.push(`Riga ${i + 1}: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+        }
+    }
+
+    return results;
+}
