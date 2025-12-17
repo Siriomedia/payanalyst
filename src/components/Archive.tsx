@@ -154,19 +154,37 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
         const headers = [
             'Anno',
             'Mese',
-            'Paga Base (€)',
+            'Netto in Busta (€)',
+            'Retribuzione Lorda (€)',
+            'Totale Trattenute (€)',
+            'Ferie Maturate (ore)',
+            'Ferie Godute (ore)',
             'Ferie Residue (ore)',
+            'Permessi Maturati (ore)',
+            'Permessi Goduti (ore)',
             'Permessi Residui (ore)',
+            'Malattia (ore)',
+            'Ex Festività (ore)',
+            'TFR Maturato (€)',
             'TFR Progressivo (€)'
         ];
 
         const rows = filteredMonthlyData.map((data) => [
             data.year,
             data.month,
-            data.paga_base ? data.paga_base.toFixed(2) : 'N/D',
-            data.ferie.residue ?? 'N/D',
-            data.permessi.residui ?? 'N/D',
-            data.tfr.progressivo ? data.tfr.progressivo.toFixed(2) : 'N/D'
+            data.netSalary ? data.netSalary.toFixed(2) : 'N/D',
+            data.grossSalary ? data.grossSalary.toFixed(2) : 'N/D',
+            data.totalDeductions ? data.totalDeductions.toFixed(2) : 'N/D',
+            data.items?.leaveData?.vacation?.accrued ?? 'N/D',
+            data.items?.leaveData?.vacation?.used ?? 'N/D',
+            data.items?.leaveData?.vacation?.balance ?? 'N/D',
+            data.items?.leaveData?.permits?.accrued ?? 'N/D',
+            data.items?.leaveData?.permits?.used ?? 'N/D',
+            data.items?.leaveData?.permits?.balance ?? 'N/D',
+            data.items?.leaveData?.sickLeave ?? 'N/D',
+            data.items?.leaveData?.exHolidays ?? 'N/D',
+            data.items?.tfr?.accrued ? data.items.tfr.accrued.toFixed(2) : 'N/D',
+            data.items?.tfr?.totalFund ? data.items.tfr.totalFund.toFixed(2) : 'N/D'
         ]);
 
         const csvContent = [
@@ -200,9 +218,9 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
             return;
         }
 
-        const headers = ['Anno', 'Mese', 'Paga Base (€)', 'Ferie Residue (ore)', 'Permessi Residui (ore)', 'TFR Progressivo (€)'];
+        const headers = ['Anno', 'Mese', 'Netto (€)', 'Lordo (€)', 'Trattenute (€)', 'Ferie Residue', 'Permessi Residui', 'TFR Progressivo'];
         const rows = filteredMonthlyData.map((data) =>
-            `${data.year},${data.month},${data.paga_base ? data.paga_base.toFixed(2) : 'N/D'},${data.ferie.residue ?? 'N/D'},${data.permessi.residui ?? 'N/D'},${data.tfr.progressivo ? data.tfr.progressivo.toFixed(2) : 'N/D'}`
+            `${data.year},${data.month},${data.netSalary ? data.netSalary.toFixed(2) : 'N/D'},${data.grossSalary ? data.grossSalary.toFixed(2) : 'N/D'},${data.totalDeductions ? data.totalDeductions.toFixed(2) : 'N/D'},${data.items?.leaveData?.vacation?.balance ?? 'N/D'},${data.items?.leaveData?.permits?.balance ?? 'N/D'},${data.items?.tfr?.totalFund ? data.items.tfr.totalFund.toFixed(2) : 'N/D'}`
         );
 
         const csvData = [headers.join(','), ...rows].join('\n');
@@ -278,32 +296,37 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
             if (filters.year && item.year.toString() !== filters.year) return false;
             if (filters.month && item.month.toString() !== filters.month) return false;
 
-            if (filters.minSalary && item.paga_base) {
-                if (item.paga_base < parseFloat(filters.minSalary)) return false;
+            const netSalary = item.netSalary;
+            const vacationBalance = item.items?.leaveData?.vacation?.balance ?? null;
+            const permitsBalance = item.items?.leaveData?.permits?.balance ?? null;
+            const tfrTotal = item.items?.tfr?.totalFund ?? null;
+
+            if (filters.minSalary && netSalary) {
+                if (netSalary < parseFloat(filters.minSalary)) return false;
             }
-            if (filters.maxSalary && item.paga_base) {
-                if (item.paga_base > parseFloat(filters.maxSalary)) return false;
+            if (filters.maxSalary && netSalary) {
+                if (netSalary > parseFloat(filters.maxSalary)) return false;
             }
 
-            if (filters.minVacation && item.ferie.residue !== null) {
-                if (item.ferie.residue < parseFloat(filters.minVacation)) return false;
+            if (filters.minVacation && vacationBalance !== null) {
+                if (vacationBalance < parseFloat(filters.minVacation)) return false;
             }
-            if (filters.maxVacation && item.ferie.residue !== null) {
-                if (item.ferie.residue > parseFloat(filters.maxVacation)) return false;
-            }
-
-            if (filters.minPermits && item.permessi.residui !== null) {
-                if (item.permessi.residui < parseFloat(filters.minPermits)) return false;
-            }
-            if (filters.maxPermits && item.permessi.residui !== null) {
-                if (item.permessi.residui > parseFloat(filters.maxPermits)) return false;
+            if (filters.maxVacation && vacationBalance !== null) {
+                if (vacationBalance > parseFloat(filters.maxVacation)) return false;
             }
 
-            if (filters.minTfr && item.tfr.progressivo) {
-                if (item.tfr.progressivo < parseFloat(filters.minTfr)) return false;
+            if (filters.minPermits && permitsBalance !== null) {
+                if (permitsBalance < parseFloat(filters.minPermits)) return false;
             }
-            if (filters.maxTfr && item.tfr.progressivo) {
-                if (item.tfr.progressivo > parseFloat(filters.maxTfr)) return false;
+            if (filters.maxPermits && permitsBalance !== null) {
+                if (permitsBalance > parseFloat(filters.maxPermits)) return false;
+            }
+
+            if (filters.minTfr && tfrTotal) {
+                if (tfrTotal < parseFloat(filters.minTfr)) return false;
+            }
+            if (filters.maxTfr && tfrTotal) {
+                if (tfrTotal > parseFloat(filters.maxTfr)) return false;
             }
 
             return true;
@@ -629,7 +652,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                                             <thead className="bg-gray-100">
                                                 <tr>
                                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mese</th>
-                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Paga Base</th>
+                                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Netto in Busta</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Ferie Residue</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Permessi Residui</th>
                                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">TFR Progressivo</th>
@@ -642,16 +665,16 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onDeletePa
                                                             {getMonthName(data.month)} {data.year}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-right text-gray-700">
-                                                            {data.paga_base ? `€${data.paga_base.toFixed(2)}` : 'N/D'}
+                                                            {data.netSalary ? `€${data.netSalary.toFixed(2)}` : 'N/D'}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-right text-gray-700">
-                                                            {data.ferie.residue ?? 'N/D'}
+                                                            {data.items?.leaveData?.vacation?.balance ?? 'N/D'}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-right text-gray-700">
-                                                            {data.permessi.residui ?? 'N/D'}
+                                                            {data.items?.leaveData?.permits?.balance ?? 'N/D'}
                                                         </td>
                                                         <td className="px-4 py-3 text-sm text-right text-gray-700">
-                                                            {data.tfr.progressivo ? `€${data.tfr.progressivo.toFixed(2)}` : 'N/D'}
+                                                            {data.items?.tfr?.totalFund ? `€${data.items.tfr.totalFund.toFixed(2)}` : 'N/D'}
                                                         </td>
                                                     </tr>
                                                 ))}

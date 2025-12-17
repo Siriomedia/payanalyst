@@ -332,19 +332,19 @@ export async function importCSVToDatabase(userId: string, csvContent: string): P
 
             const year = parseInt(values[0]) || 0;
             const month = parseInt(values[1]) || 0;
-            const grossSalary = parseNumber(values[5]);
-            const totalDeductions = parseNumber(values[6]);
-            const netSalary = parseNumber(values[7]);
-            const tfrAccrued = parseNumber(values[12]);
-            const tfrTotal = parseNumber(values[13]);
-            const vacationAccrued = parseNumber(values[14]);
-            const vacationTaken = parseNumber(values[15]);
-            const vacationBalance = parseNumber(values[16]);
-            const permitsAccrued = parseNumber(values[17]);
-            const permitsTaken = parseNumber(values[18]);
-            const permitsBalance = parseNumber(values[19]);
-            const sickLeave = parseNumber(values[20]);
-            const exHolidays = parseNumber(values[21]);
+            const netSalary = parseNumber(values[2]);
+            const grossSalary = parseNumber(values[3]);
+            const totalDeductions = parseNumber(values[4]);
+            const vacationAccrued = parseNumber(values[5]);
+            const vacationTaken = parseNumber(values[6]);
+            const vacationBalance = parseNumber(values[7]);
+            const permitsAccrued = parseNumber(values[8]);
+            const permitsTaken = parseNumber(values[9]);
+            const permitsBalance = parseNumber(values[10]);
+            const sickLeave = parseNumber(values[11]);
+            const exHolidays = parseNumber(values[12]);
+            const tfrAccrued = parseNumber(values[13]);
+            const tfrTotal = parseNumber(values[14]);
 
             const items = {
                 leaveData: {
@@ -406,8 +406,9 @@ export async function importCSVToDatabase(userId: string, csvContent: string): P
 
             results.success++;
         } catch (error) {
-            console.error(`❌ Errore riga ${i + 1}:`, error);
-            results.errors.push(`Riga ${i + 1}: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+            const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+            console.error(`❌ Errore riga ${i + 1}:`, errorMsg, 'Dati riga:', lines[i]);
+            results.errors.push(`Riga ${i + 1}: ${errorMsg}`);
         }
     }
 
