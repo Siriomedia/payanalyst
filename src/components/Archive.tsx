@@ -80,11 +80,15 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                                         id={`compare-${p.id}`}
                                         name={`compare-${p.id}`}
                                         aria-label={`Seleziona per confronto: ${getMonthName(p.period.month)} ${p.period.year}`}
-                                        className="h-5 w-5 sm:h-6 sm:w-6 rounded border-2 border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                                        className="h-5 w-5 sm:h-6 sm:w-6 rounded border-2 border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 flex-shrink-0"
                                         checked={selectedForCompare.includes(p.id)}
-                                        onChange={() => toggleCompareSelection(p.id)}
+                                        onChange={(e) => {
+                                            e.stopPropagation();
+                                            toggleCompareSelection(p.id);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
                                     />
-                                    <div className="ml-3 sm:ml-4 flex-grow cursor-pointer" onClick={() => onSelectPayslip(p)}>
+                                    <div className="ml-3 sm:ml-4 flex-grow">
                                         <p className="font-bold text-base sm:text-lg text-gray-800 capitalize">
                                             {getMonthName(p.period.month)} {p.period.year}
                                         </p>
@@ -96,13 +100,16 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                                         <EuroIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
                                         <span className="font-semibold text-base sm:text-lg ml-1 sm:ml-2">{p.netSalary.toFixed(2)}</span>
                                      </div>
-                                    <button 
-                                        onClick={() => onSelectPayslip(p)}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onSelectPayslip(p);
+                                        }}
                                         className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
                                     >
                                         Visualizza
                                     </button>
-                                     <button 
+                                     <button
                                         onClick={(e) => { e.stopPropagation(); onDeletePayslip(p.id); }}
                                         className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"
                                         aria-label="Elimina busta paga"
