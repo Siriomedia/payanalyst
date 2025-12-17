@@ -1,16 +1,19 @@
 import { supabase } from '../supabase.ts';
 import { Payslip } from '../types.ts';
+import { firebaseUidToUuid } from '../utils/uuidHelpers.ts';
 
 export async function savePayslipToDatabase(userId: string, payslip: Payslip): Promise<void> {
+    const supabaseUserId = firebaseUidToUuid(userId);
     try {
         console.log('💾 Salvando busta paga in Supabase...');
-        console.log('   - User ID:', userId);
+        console.log('   - Firebase UID:', userId);
+        console.log('   - Supabase UUID:', supabaseUserId);
         console.log('   - Periodo:', `${payslip.month}/${payslip.year}`);
 
         const { data: existingPayslip, error: checkError } = await supabase
             .from('payslips')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', supabaseUserId)
             .eq('period_month', payslip.month)
             .eq('period_year', payslip.year)
             .maybeSingle();
@@ -21,7 +24,7 @@ export async function savePayslipToDatabase(userId: string, payslip: Payslip): P
         }
 
         const payslipData = {
-            user_id: userId,
+            user_id: supabaseUserId,
             period_month: payslip.month,
             period_year: payslip.year,
             employee_first_name: payslip.employeeInfo?.firstName || '',
@@ -61,7 +64,7 @@ export async function savePayslipToDatabase(userId: string, payslip: Payslip): P
         const { data: existingMonthly, error: monthlyCheckError } = await supabase
             .from('monthly_data')
             .select('id')
-            .eq('user_id', userId)
+            .eq('user_id', supabaseUserId)
             .eq('month', payslip.month)
             .eq('year', payslip.year)
             .maybeSingle();
@@ -72,7 +75,7 @@ export async function savePayslipToDatabase(userId: string, payslip: Payslip): P
         }
 
         const monthlyData = {
-            user_id: userId,
+            user_id: supabaseUserId,
             month: payslip.month,
             year: payslip.year,
             net_salary: payslip.netSalary,
