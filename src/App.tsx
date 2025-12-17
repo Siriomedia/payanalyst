@@ -276,7 +276,7 @@ const App: React.FC = () => {
         return payslips.length > 0 ? payslips[0] : null;
     });
 
-    const [payslipsToCompare, setPayslipsToCompare] = useState<[Payslip, Payslip] | null>(null);
+    const [payslipsToCompare, setPayslipsToCompare] = useState<Payslip[] | null>(null);
     const [alert, setAlert] = useState<string | null>(null);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -554,17 +554,14 @@ const App: React.FC = () => {
     //
     // COMPARE PAYSLIPS - Navigate to Compare view
     //
-    const handleComparePayslips = (payslipsToCompareArr: [Payslip, Payslip]) => {
-        // Prima controlla i crediti
+    const handleComparePayslips = (payslipsToCompareArr: Payslip[]) => {
         const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
         if (!canProceed) {
             return;
         }
-        
-        // Imposta le buste paga da confrontare e naviga
+
         setPayslipsToCompare(payslipsToCompareArr);
-        
-        // Naviga alla vista Confronto
+
         setTimeout(() => {
             setCurrentView(View.Compare);
         }, 0);

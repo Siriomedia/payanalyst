@@ -5,7 +5,7 @@ import { EuroIcon, TrashIcon } from './common/Icons.tsx';
 interface ArchiveProps {
     payslips: Payslip[];
     onSelectPayslip: (payslip: Payslip) => void;
-    onCompare: (payslips: [Payslip, Payslip]) => void;
+    onCompare: (payslips: Payslip[]) => void;
     onDeletePayslip: (payslipId: string) => void;
 }
 
@@ -17,24 +17,23 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
             if (prev.includes(payslipId)) {
                 return prev.filter(id => id !== payslipId);
             }
-            if (prev.length < 2) {
+            if (prev.length < 12) {
                 return [...prev, payslipId];
             }
-            return [prev[1], payslipId]; // keep last two
+            return prev;
         });
     };
 
     const handleCompareClick = () => {
-        if (selectedForCompare.length === 2) {
+        if (selectedForCompare.length >= 2) {
             const payslipsToCompare = payslips.filter(p => selectedForCompare.includes(p.id));
-            if (payslipsToCompare.length === 2) {
-                // Ordina: più recente prima, meno recente dopo
+            if (payslipsToCompare.length >= 2) {
                 const sorted = [...payslipsToCompare].sort((a, b) => {
                     const dateA = new Date(a.period.year, a.period.month - 1);
                     const dateB = new Date(b.period.year, b.period.month - 1);
-                    return dateB.getTime() - dateA.getTime(); // Decrescente
+                    return dateB.getTime() - dateA.getTime();
                 });
-                onCompare([sorted[0], sorted[1]]);
+                onCompare(sorted);
             }
         }
     };
@@ -45,19 +44,19 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio Buste Paga</h1>
-                {selectedForCompare.length === 2 ? (
-                    <button 
+                {selectedForCompare.length >= 2 ? (
+                    <button
                         type="button"
                         onClick={handleCompareClick}
                         className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
                     >
-                        <span className="hidden sm:inline">Confronta Selezionati (2/2)</span>
-                        <span className="sm:hidden">Confronta (2/2)</span>
+                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length})</span>
+                        <span className="sm:hidden">Confronta ({selectedForCompare.length})</span>
                     </button>
                 ) : (
                     <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
-                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/2)</span>
-                        <span className="sm:hidden">Confronta ({selectedForCompare.length}/2)</span>
+                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/12)</span>
+                        <span className="sm:hidden">Confronta ({selectedForCompare.length}/12)</span>
                     </span>
                 )}
             </div>
@@ -68,7 +67,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                 <>
                 {selectedForCompare.length < 2 && (
                     <p className="text-sm text-gray-500 mb-3 italic">
-                        Seleziona 2 buste paga usando le caselle a sinistra per confrontarle
+                        Seleziona da 2 a 12 buste paga usando le caselle a sinistra per confrontarle
                     </p>
                 )}
                 <div className="bg-white rounded-xl shadow-md overflow-hidden">

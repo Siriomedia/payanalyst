@@ -1080,18 +1080,24 @@ Codice F00880 "Rimborsi da 730":
     }
 };
 
-export const getComparisonAnalysis = async (p1: Payslip, p2: Payslip): Promise<string> => {
+export const getComparisonAnalysis = async (payslips: Payslip[]): Promise<string> => {
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
 
-    const prompt = `In qualità di consulente del lavoro, analizza e confronta le seguenti due buste paga in formato JSON.
-Busta Paga 1 (${getMonthName(p1.period.month)} ${p1.period.year}):
-${JSON.stringify(p1, null, 2)}
+    const payslipsData = payslips.map((p, idx) =>
+        `Busta Paga ${idx + 1} (${getMonthName(p.period.month)} ${p.period.year}):\n${JSON.stringify(p, null, 2)}`
+    ).join('\n\n');
 
-Busta Paga 2 (${getMonthName(p2.period.month)} ${p2.period.year}):
-${JSON.stringify(p2, null, 2)}
+    const prompt = `In qualità di consulente del lavoro, analizza e confronta le seguenti ${payslips.length} buste paga in formato JSON.
 
-Fornisci un'analisi sintetica ma professionale che metta in luce le differenze principali. Spiega le possibili cause delle variazioni più significative (es. bonus, straordinari, conguagli fiscali, scatti di anzianità). 
-Struttura la risposta in modo chiaro e facile da capire per un non addetto ai lavori. Concentrati solo sull'analisi comparativa.`;
+${payslipsData}
+
+Fornisci un'analisi sintetica ma professionale che metta in luce:
+1. Le tendenze principali nell'evoluzione dello stipendio e delle voci retributive
+2. Le variazioni più significative tra i periodi (es. bonus, straordinari, conguagli fiscali, scatti di anzianità)
+3. L'evoluzione delle trattenute fiscali e previdenziali
+4. Eventuali anomalie o particolarità degne di nota
+
+Struttura la risposta in modo chiaro e facile da capire per un non addetto ai lavori. Concentrati sull'analisi comparativa complessiva.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
