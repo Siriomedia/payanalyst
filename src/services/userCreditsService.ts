@@ -1,30 +1,39 @@
-// src/services/userCreditsService.ts
-import { db } from "../firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { supabase } from '../supabase';
 
 export async function getCredits(uid: string) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
+  const { data, error } = await supabase
+    .from('users')
+    .select('credits')
+    .eq('id', uid)
+    .maybeSingle();
 
-  if (!snap.exists()) return null;
+  if (error || !data) return null;
 
-  return snap.data().credits;
+  return data.credits;
 }
 
 export async function setCredits(uid: string, credits: number) {
-  const ref = doc(db, "users", uid);
-  await setDoc(ref, { credits }, { merge: true });
+  const { error } = await supabase
+    .from('users')
+    .update({ credits, updated_at: new Date().toISOString() })
+    .eq('id', uid);
+
+  if (error) throw error;
 }
 
-// Verrà usato da PayPal
 export async function addCredits(uid: string, amount: number) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
+  const { data, error } = await supabase
+    .from('users')
+    .select('credits')
+    .eq('id', uid)
+    .maybeSingle();
 
-  const current = snap.exists() ? snap.data().credits || 0 : 0;
+  if (error) throw error;
+
+  const current = data?.credits || 0;
   const updated = current + amount;
 
-  await setDoc(ref, { credits: updated }, { merge: true });
+  await setCredits(uid, updated);
 
   return updated;
 }

@@ -1,42 +1,65 @@
-// src/services/authService.ts
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-  UserCredential
-} from "firebase/auth";
-import { auth } from "../firebase";
-import {
-  doc,
-  setDoc,
-  getDoc
-} from "firebase/firestore";
-import { db } from "../firebase";
+import { supabase } from '../supabase';
 
-// Carica i dati utente da Firestore
 export async function loadUserData(uid: string) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', uid)
+    .maybeSingle();
 
-  return snap.exists() ? snap.data() : null;
+  if (error) {
+    console.error('Error loading user data:', error);
+    return null;
+  }
+
+  return data;
 }
 
-// Salva nuovi dati utente su Firestore
-export async function saveUserData(uid: string, data: any) {
-  const ref = doc(db, "users", uid);
-  await setDoc(ref, data, { merge: true });
+export async function saveUserData(uid: string, userData: any) {
+  const { error } = await supabase
+    .from('users')
+    .upsert({
+      id: uid,
+      ...userData,
+      updated_at: new Date().toISOString()
+    });
+
+  if (error) {
+    console.error('Error saving user data:', error);
+    throw error;
+  }
 }
 
 export async function register(email: string, password: string) {
-  const cred: UserCredential = await createUserWithEmailAndPassword(auth, email, password);
-  return cred.user.uid;
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Registration failed');
+
+  return data.user.id;
 }
 
 export async function login(email: string, password: string) {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  return cred.user.uid;
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Login failed');
+
+  return data.user.id;
 }
 
 export async function logoutFirebase() {
-  await signOut(auth);
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+export async function getCurrentUser() {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
 }

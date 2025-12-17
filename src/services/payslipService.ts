@@ -1,5 +1,4 @@
 import { supabase } from '../supabase';
-import { firebaseUidToUuid } from '../utils/uuidHelpers';
 import { Payslip } from '../types';
 
 export interface PayslipRecord {
@@ -19,11 +18,10 @@ export interface PayslipRecord {
 }
 
 export const savePayslip = async (userId: string, payslip: Payslip): Promise<void> => {
-    const supabaseUserId = firebaseUidToUuid(userId);
     const { error } = await supabase
         .from('payslips')
         .insert({
-            user_id: supabaseUserId,
+            user_id: userId,
             period_month: payslip.period.month,
             period_year: payslip.period.year,
             employee_first_name: payslip.employee.firstName,
@@ -180,11 +178,10 @@ export interface MonthlyData {
 }
 
 export async function getUserPayslipsForArchive(userId: string, limitCount?: number): Promise<PayslipData[]> {
-    const supabaseUserId = firebaseUidToUuid(userId);
     let query = supabase
         .from('payslips')
         .select('*')
-        .eq('user_id', supabaseUserId)
+        .eq('user_id', userId)
         .order('period_year', { ascending: false })
         .order('period_month', { ascending: false });
 
@@ -213,11 +210,10 @@ export async function getUserPayslipsForArchive(userId: string, limitCount?: num
 }
 
 export async function getUserMonthlyData(userId: string): Promise<MonthlyData[]> {
-    const supabaseUserId = firebaseUidToUuid(userId);
     const { data, error } = await supabase
         .from('monthly_data')
         .select('*')
-        .eq('user_id', supabaseUserId)
+        .eq('user_id', userId)
         .order('year', { ascending: false })
         .order('month', { ascending: false });
 
@@ -295,7 +291,6 @@ export async function calculateUserStatistics(userId: string): Promise<{
 }
 
 export async function importCSVToDatabase(userId: string, csvContent: string): Promise<{ success: number; errors: string[] }> {
-    const supabaseUserId = firebaseUidToUuid(userId);
     const lines = csvContent.split('\n').filter(line => line.trim());
 
     if (lines.length < 2) {
@@ -375,7 +370,7 @@ export async function importCSVToDatabase(userId: string, csvContent: string): P
             const { data: existing } = await supabase
                 .from('monthly_data')
                 .select('id')
-                .eq('user_id', supabaseUserId)
+                .eq('user_id', userId)
                 .eq('year', year)
                 .eq('month', month)
                 .maybeSingle();
@@ -397,7 +392,7 @@ export async function importCSVToDatabase(userId: string, csvContent: string): P
                 const { error } = await supabase
                     .from('monthly_data')
                     .insert({
-                        user_id: supabaseUserId,
+                        user_id: userId,
                         year: year,
                         month: month,
                         net_salary: netSalary,
