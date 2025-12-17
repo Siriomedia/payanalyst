@@ -4,7 +4,6 @@ import { ChatMessage, Payslip } from '../types.ts';
 import { SendIcon, PaperclipIcon } from './common/Icons.tsx';
 import Spinner from './common/Spinner.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
-import { buildUserDatabaseContext } from '../services/databaseQueryService.ts';
 
 interface AssistantProps {
     payslips: Payslip[];
@@ -12,12 +11,9 @@ interface AssistantProps {
     focusedPayslip?: Payslip | null;
     payslipsToCompare?: [Payslip, Payslip] | null;
     handleCreditConsumption: (cost: number) => boolean;
-    userId?: string;
-    externalDatabaseContext?: string | null;
-    onClearDatabaseContext?: () => void;
 }
 
-const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption, userId, externalDatabaseContext, onClearDatabaseContext }) => {
+const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, payslipsToCompare, handleCreditConsumption }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [attachment, setAttachment] = useState<File | null>(null);
@@ -61,18 +57,9 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
         setAttachment(null);
         setIsLoading(true);
 
-        let databaseContext: string | undefined;
-        if (userId) {
-            try {
-                databaseContext = await buildUserDatabaseContext(userId);
-            } catch (error) {
-                console.error('Errore costruzione contesto database:', error);
-            }
-        }
-
-        const context = mode === 'general'
-            ? { payslips, file: currentAttachment, includeTaxTables, userId, databaseContext, externalDatabaseContext }
-            : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare, userId, databaseContext };
+        const context = mode === 'general' 
+            ? { payslips, file: currentAttachment, includeTaxTables }
+            : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare };
 
         try {
             const stream = await getChatResponse(history, currentInput, context);
@@ -156,25 +143,6 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
                     {getSubheader()}
                 </p>
             </div>
-
-            {externalDatabaseContext && (
-                <div className="p-3 bg-purple-50 border-b border-purple-200">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-purple-700 font-semibold text-sm">Database Storico caricato</span>
-                            <span className="text-xs text-purple-600">Dati pronti per l'analisi</span>
-                        </div>
-                        <button
-                            onClick={onClearDatabaseContext}
-                            className="text-purple-700 hover:text-purple-900 font-bold text-lg"
-                            aria-label="Rimuovi contesto database"
-                        >
-                            ×
-                        </button>
-                    </div>
-                </div>
-            )}
-
              <div className="p-4 border-b border-gray-200">
                 {attachment && mode === 'general' && (
                     <div className="mb-2 px-3 py-1.5 bg-blue-100 text-blue-800 text-sm rounded-full inline-block">

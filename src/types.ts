@@ -4,6 +4,7 @@ export enum View {
     Dashboard = 'dashboard',
     Upload = 'upload',
     Archive = 'archive',
+    Compare = 'compare',
     Assistant = 'assistant',
     Settings = 'settings',
     ShiftPlanner = 'shift_planner',

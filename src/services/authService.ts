@@ -1,81 +1,42 @@
-import { supabase } from '../supabase';
+// src/services/authService.ts
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  UserCredential
+} from "firebase/auth";
+import { auth } from "../firebase";
+import {
+  doc,
+  setDoc,
+  getDoc
+} from "firebase/firestore";
+import { db } from "../firebase";
 
+// Carica i dati utente da Firestore
 export async function loadUserData(uid: string) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', uid)
-    .maybeSingle();
+  const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
 
-  if (error) {
-    console.error('Error loading user data:', error);
-    return null;
-  }
-
-  return data;
+  return snap.exists() ? snap.data() : null;
 }
 
-export async function saveUserData(uid: string, userData: any) {
-  const { error } = await supabase
-    .from('users')
-    .upsert({
-      id: uid,
-      ...userData,
-      updated_at: new Date().toISOString()
-    });
-
-  if (error) {
-    console.error('Error saving user data:', error);
-    throw error;
-  }
+// Salva nuovi dati utente su Firestore
+export async function saveUserData(uid: string, data: any) {
+  const ref = doc(db, "users", uid);
+  await setDoc(ref, data, { merge: true });
 }
 
-export async function register(email: string, password: string, userData?: { firstName?: string; lastName?: string }) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  });
-
-  if (error) throw error;
-  if (!data.user) throw new Error('Registration failed');
-
-  if (userData) {
-    await supabase
-      .from('users')
-      .upsert({
-        id: data.user.id,
-        email: email,
-        first_name: userData.firstName || '',
-        last_name: userData.lastName || '',
-        role: 'user',
-        plan: 'free',
-        credits: 10,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      });
-  }
-
-  return data.user.id;
+export async function register(email: string, password: string) {
+  const cred: UserCredential = await createUserWithEmailAndPassword(auth, email, password);
+  return cred.user.uid;
 }
 
 export async function login(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error) throw error;
-  if (!data.user) throw new Error('Login failed');
-
-  return data.user.id;
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  return cred.user.uid;
 }
 
 export async function logoutFirebase() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-}
-
-export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  await signOut(auth);
 }
