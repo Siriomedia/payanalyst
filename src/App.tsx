@@ -573,11 +573,6 @@ const App: React.FC = () => {
     // COMPARE PAYSLIPS - Navigate to Compare view
     //
     const handleComparePayslips = (payslipsToCompareArr: Payslip[]) => {
-        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
-        if (!canProceed) {
-            return;
-        }
-
         setPayslipsToCompare(payslipsToCompareArr);
 
         setTimeout(() => {
@@ -667,7 +662,7 @@ const App: React.FC = () => {
                                 />
                             );
                         case View.Compare:
-                            return <Compare payslips={payslipsToCompare} />;
+                            return <Compare payslips={payslipsToCompare} handleCreditConsumption={handleCreditConsumption} />;
                         case View.Assistant:
                             return (
                                 <Assistant
