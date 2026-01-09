@@ -249,24 +249,29 @@ const App: React.FC = () => {
     // Carica buste paga dal database quando l'utente è autenticato
     useEffect(() => {
         const loadPayslips = async () => {
-            if (!auth.currentUser) {
+            if (!auth.currentUser || !user) {
                 setPayslipsLoading(false);
                 return;
             }
 
+            // Usa l'ID del sistema (user.id), non il Firebase UID
+            const userIdToUse = user.id || auth.currentUser.uid;
+            console.log('📥 Caricamento iniziale buste paga per userId:', userIdToUse);
+
             // Carica dal database
-            const { payslips: dbPayslips } = await getUserPayslips(auth.currentUser.uid);
+            const { payslips: dbPayslips } = await getUserPayslips(userIdToUse);
+            console.log('📥 Caricate', dbPayslips.length, 'buste paga dal database');
 
             // Migra buste paga da localStorage se esistono
             try {
                 const localPayslips = JSON.parse(localStorage.getItem("gioia_payslips") || "[]");
                 if (localPayslips.length > 0) {
                     console.log('Migrazione buste paga da localStorage...', localPayslips.length, 'buste paga');
-                    await migrateLocalPayslipsToDatabase(auth.currentUser.uid, localPayslips);
+                    await migrateLocalPayslipsToDatabase(userIdToUse, localPayslips);
                     localStorage.removeItem("gioia_payslips");
 
                     // Ricarica dal database dopo la migrazione
-                    const { payslips: updatedPayslips } = await getUserPayslips(auth.currentUser.uid);
+                    const { payslips: updatedPayslips } = await getUserPayslips(userIdToUse);
                     setPayslips(updatedPayslips);
                 } else {
                     setPayslips(dbPayslips);
@@ -280,7 +285,7 @@ const App: React.FC = () => {
         };
 
         loadPayslips();
-    }, [auth.currentUser?.uid]);
+    }, [auth.currentUser?.uid, user?.id]);
 
     const [shifts, setShifts] = useState<Shift[]>(() => {
         try { return JSON.parse(localStorage.getItem("gioia_shifts") || "[]"); }
@@ -424,15 +429,20 @@ const App: React.FC = () => {
         // Admin bypassa tutti i controlli
         if (user && user.role === "admin" && auth.currentUser) {
             console.log('🔑 UTENTE ADMIN: Bypassa controlli e salva sempre');
+            console.log('🔑 Firebase Auth UID:', auth.currentUser.uid);
+            console.log('👤 User ID nel sistema:', user.id);
 
-            // Salva la busta paga nel database
-            const saveResult = await savePayslipToDatabase(auth.currentUser.uid, newPayslip);
+            // Salva la busta paga nel database usando l'ID del sistema, non Firebase UID
+            const userIdToUse = user.id || auth.currentUser.uid;
+            console.log('💾 Salvataggio con userId:', userIdToUse);
+
+            const saveResult = await savePayslipToDatabase(userIdToUse, newPayslip);
             if (saveResult.success) {
                 // Ricarica le buste paga dal database
                 await reloadPayslips();
                 console.log('✅ Admin: Busta paga salvata. Archivio aggiornato dal database');
             } else {
-                console.error('Errore salvataggio:', saveResult.error);
+                console.error('❌ Errore salvataggio:', saveResult.error);
             }
 
             setAlert(null);
@@ -548,16 +558,21 @@ const App: React.FC = () => {
         if (nameMatches && auth.currentUser) {
             // DATI CORRISPONDENTI → Salva busta paga
             console.log('✅ SALVATAGGIO IN ARCHIVIO: Nome e cognome corrispondono');
+            console.log('🔑 Firebase Auth UID:', auth.currentUser.uid);
+            console.log('👤 User ID nel sistema:', user?.id);
 
-            // Salva la busta paga nel database
-            const saveResult = await savePayslipToDatabase(auth.currentUser.uid, newPayslip);
+            // Salva la busta paga nel database usando l'ID del sistema, non Firebase UID
+            const userIdToUse = user?.id || auth.currentUser.uid;
+            console.log('💾 Salvataggio con userId:', userIdToUse);
+
+            const saveResult = await savePayslipToDatabase(userIdToUse, newPayslip);
             if (saveResult.success) {
                 // Ricarica le buste paga dal database
                 await reloadPayslips();
                 console.log('✅ Busta paga salvata. Archivio aggiornato dal database');
                 setAlert(null);
             } else {
-                console.error('Errore salvataggio:', saveResult.error);
+                console.error('❌ Errore salvataggio:', saveResult.error);
                 setAlert('Errore nel salvataggio della busta paga. Riprova.');
             }
         } else {
@@ -626,8 +641,16 @@ const App: React.FC = () => {
     // RELOAD PAYSLIPS FROM DATABASE
     //
     const reloadPayslips = async () => {
-        if (auth.currentUser) {
-            const { payslips: dbPayslips } = await getUserPayslips(auth.currentUser.uid);
+        if (auth.currentUser && user) {
+            // Usa l'ID del sistema (user.id), non il Firebase UID
+            const userIdToUse = user.id || auth.currentUser.uid;
+            console.log('🔄 Ricaricamento buste paga per userId:', userIdToUse);
+            const { payslips: dbPayslips, error } = await getUserPayslips(userIdToUse);
+            if (error) {
+                console.error('❌ Errore nel caricamento delle buste paga:', error);
+            } else {
+                console.log('✅ Caricate', dbPayslips.length, 'buste paga dal database');
+            }
             setPayslips(dbPayslips);
         }
     };

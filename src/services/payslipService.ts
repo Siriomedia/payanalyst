@@ -22,7 +22,14 @@ export const savePayslipToDatabase = async (
   payslip: Payslip
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const { error } = await supabase
+    console.log('🔵 savePayslipToDatabase chiamata con:', {
+      userId,
+      payslipId: payslip.id,
+      employee: `${payslip.employee.firstName} ${payslip.employee.lastName}`,
+      period: `${payslip.period.month}/${payslip.period.year}`
+    });
+
+    const { data, error } = await supabase
       .from('payslips')
       .insert({
         id: payslip.id,
@@ -36,16 +43,19 @@ export const savePayslipToDatabase = async (
         gross_salary: payslip.grossSalary,
         total_deductions: payslip.totalDeductions,
         data: payslip as any,
-      });
+      })
+      .select();
 
     if (error) {
-      console.error('Errore nel salvataggio della busta paga:', error);
+      console.error('❌ Errore nel salvataggio della busta paga:', error);
+      console.error('❌ Dettagli errore:', JSON.stringify(error, null, 2));
       return { success: false, error: error.message };
     }
 
+    console.log('✅ Busta paga salvata con successo:', data);
     return { success: true };
   } catch (error) {
-    console.error('Errore nel salvataggio della busta paga:', error);
+    console.error('❌ Errore catch nel salvataggio della busta paga:', error);
     return { success: false, error: String(error) };
   }
 };
@@ -54,6 +64,7 @@ export const getUserPayslips = async (
   userId: string
 ): Promise<{ payslips: Payslip[]; error?: string }> => {
   try {
+    console.log('🔍 getUserPayslips per userId:', userId);
     const { data, error } = await supabase
       .from('payslips')
       .select('*')
@@ -62,14 +73,15 @@ export const getUserPayslips = async (
       .order('period_month', { ascending: false });
 
     if (error) {
-      console.error('Errore nel recupero delle buste paga:', error);
+      console.error('❌ Errore nel recupero delle buste paga:', error);
       return { payslips: [], error: error.message };
     }
 
+    console.log('✅ Trovate', data?.length || 0, 'buste paga nel database');
     const payslips: Payslip[] = (data || []).map((row: any) => row.data as Payslip);
     return { payslips };
   } catch (error) {
-    console.error('Errore nel recupero delle buste paga:', error);
+    console.error('❌ Errore catch nel recupero delle buste paga:', error);
     return { payslips: [], error: String(error) };
   }
 };
