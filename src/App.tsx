@@ -243,7 +243,25 @@ const App: React.FC = () => {
     // LOCAL DATA
     //
     const [payslips, setPayslips] = useState<Payslip[]>(() => {
-        try { return JSON.parse(localStorage.getItem("gioia_payslips") || "[]"); }
+        try {
+            const loaded = JSON.parse(localStorage.getItem("gioia_payslips") || "[]");
+
+            // Verifica e rigenera ID duplicati
+            const ids = new Set<string>();
+            const fixed = loaded.map((p: Payslip) => {
+                if (!p.id || ids.has(p.id)) {
+                    // ID mancante o duplicato - rigenera
+                    const newId = `payslip-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+                    console.warn('ID duplicato o mancante trovato, rigenerato:', newId);
+                    ids.add(newId);
+                    return { ...p, id: newId };
+                }
+                ids.add(p.id);
+                return p;
+            });
+
+            return fixed;
+        }
         catch { return []; }
     });
 
@@ -555,11 +573,6 @@ const App: React.FC = () => {
     // COMPARE PAYSLIPS - Navigate to Compare view
     //
     const handleComparePayslips = (payslipsToCompareArr: Payslip[]) => {
-        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
-        if (!canProceed) {
-            return;
-        }
-
         setPayslipsToCompare(payslipsToCompareArr);
 
         setTimeout(() => {
@@ -649,7 +662,7 @@ const App: React.FC = () => {
                                 />
                             );
                         case View.Compare:
-                            return <Compare payslips={payslipsToCompare} />;
+                            return <Compare payslips={payslipsToCompare} handleCreditConsumption={handleCreditConsumption} />;
                         case View.Assistant:
                             return (
                                 <Assistant
