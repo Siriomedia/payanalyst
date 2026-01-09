@@ -18,7 +18,7 @@ import PayrollReference from './components/PayrollReference.tsx';
 import { View, Payslip, User, Shift, LeavePlan, Absence, Plan } from './types.ts';
 import { PLANS, CREDIT_COSTS } from './config/plans.ts';
 import { normalizeTimestamp } from './utils/timestampHelpers.ts';
-import { getUserPayslips, deletePayslipFromDatabase, migrateLocalPayslipsToDatabase } from './services/payslipService.ts';
+import { getUserPayslips, deletePayslipFromDatabase, migrateLocalPayslipsToDatabase, savePayslipToDatabase } from './services/payslipService.ts';
 
 // FIREBASE
 import { auth, db } from "./firebase.ts";
@@ -422,13 +422,19 @@ const App: React.FC = () => {
         setSelectedPayslip(newPayslip);
 
         // Admin bypassa tutti i controlli
-        if (user && user.role === "admin") {
+        if (user && user.role === "admin" && auth.currentUser) {
             console.log('🔑 UTENTE ADMIN: Bypassa controlli e salva sempre');
 
-            // Ricarica le buste paga dal database (la busta paga è già stata salvata da Upload.tsx)
-            await reloadPayslips();
+            // Salva la busta paga nel database
+            const saveResult = await savePayslipToDatabase(auth.currentUser.uid, newPayslip);
+            if (saveResult.success) {
+                // Ricarica le buste paga dal database
+                await reloadPayslips();
+                console.log('✅ Admin: Busta paga salvata. Archivio aggiornato dal database');
+            } else {
+                console.error('Errore salvataggio:', saveResult.error);
+            }
 
-            console.log('✅ Admin: Busta paga salvata. Archivio aggiornato dal database');
             setAlert(null);
             setCurrentView(View.Dashboard);
             return;
@@ -539,15 +545,21 @@ const App: React.FC = () => {
         console.log('Cognome corrisponde?', lastNameMatch);
         console.log('Risultato finale - Salva in archivio?', nameMatches);
 
-        if (nameMatches) {
+        if (nameMatches && auth.currentUser) {
             // DATI CORRISPONDENTI → Salva busta paga
             console.log('✅ SALVATAGGIO IN ARCHIVIO: Nome e cognome corrispondono');
 
-            // Ricarica le buste paga dal database (la busta paga è già stata salvata da Upload.tsx)
-            await reloadPayslips();
-
-            console.log('✅ Busta paga salvata. Archivio aggiornato dal database');
-            setAlert(null);
+            // Salva la busta paga nel database
+            const saveResult = await savePayslipToDatabase(auth.currentUser.uid, newPayslip);
+            if (saveResult.success) {
+                // Ricarica le buste paga dal database
+                await reloadPayslips();
+                console.log('✅ Busta paga salvata. Archivio aggiornato dal database');
+                setAlert(null);
+            } else {
+                console.error('Errore salvataggio:', saveResult.error);
+                setAlert('Errore nel salvataggio della busta paga. Riprova.');
+            }
         } else {
             // DATI NON CORRISPONDENTI → Solo analisi temporanea, NON salvare
             console.log('❌ NON SALVATO: Nome e/o cognome NON corrispondono');

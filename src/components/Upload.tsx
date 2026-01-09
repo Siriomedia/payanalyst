@@ -1,12 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { analyzePayslip } from '../services/geminiService.ts';
-import { savePayslipToDatabase } from '../services/payslipService.ts';
 import { Payslip } from '../types.ts';
 import Spinner from './common/Spinner.tsx';
 import { UploadIcon } from './common/Icons.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
 import { User } from '../types.ts';
-import { auth } from '../firebase.ts';
 
 interface UploadProps {
     user: User;
@@ -153,14 +151,6 @@ const Upload: React.FC<UploadProps> = ({ user, onAnalysisComplete, handleCreditC
             if (!creditsConsumed) {
                 handleCreditConsumption(CREDIT_COSTS.PAYSLIP_ANALYSIS);
                 setCreditsConsumed(true);
-            }
-
-            // Salva la busta paga nel database
-            if (auth.currentUser) {
-                const saveResult = await savePayslipToDatabase(auth.currentUser.uid, payslipData);
-                if (!saveResult.success) {
-                    console.error('Errore nel salvataggio nel database:', saveResult.error);
-                }
             }
 
             // Rimuovi info file salvate dopo successo
