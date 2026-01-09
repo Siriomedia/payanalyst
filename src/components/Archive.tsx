@@ -17,11 +17,16 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
             if (prev.includes(payslipId)) {
                 return prev.filter(id => id !== payslipId);
             }
-            if (prev.length < 12) {
-                return [...prev, payslipId];
-            }
-            return prev;
+            return [...prev, payslipId];
         });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedForCompare.length === payslips.length) {
+            setSelectedForCompare([]);
+        } else {
+            setSelectedForCompare(payslips.map(p => p.id));
+        }
     };
 
     const handleCompareClick = () => {
@@ -44,21 +49,30 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
         <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Archivio Buste Paga</h1>
-                {selectedForCompare.length >= 2 ? (
+                <div className="flex gap-2">
                     <button
                         type="button"
-                        onClick={handleCompareClick}
-                        className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
+                        onClick={handleSelectAll}
+                        className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer transition-colors whitespace-nowrap"
                     >
-                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length})</span>
-                        <span className="sm:hidden">Confronta ({selectedForCompare.length})</span>
+                        {selectedForCompare.length === payslips.length ? 'Deseleziona Tutto' : 'Seleziona Tutto'}
                     </button>
-                ) : (
-                    <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
-                        <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length}/12)</span>
-                        <span className="sm:hidden">Confronta ({selectedForCompare.length}/12)</span>
-                    </span>
-                )}
+                    {selectedForCompare.length >= 2 ? (
+                        <button
+                            type="button"
+                            onClick={handleCompareClick}
+                            className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-blue-600 text-white hover:bg-blue-700 cursor-pointer transition-colors whitespace-nowrap"
+                        >
+                            <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length})</span>
+                            <span className="sm:hidden">Confronta ({selectedForCompare.length})</span>
+                        </button>
+                    ) : (
+                        <span className="px-3 sm:px-4 py-2 text-sm sm:text-base font-semibold rounded-lg shadow-md bg-gray-300 text-gray-500 whitespace-nowrap">
+                            <span className="hidden sm:inline">Confronta Selezionati ({selectedForCompare.length})</span>
+                            <span className="sm:hidden">Confronta ({selectedForCompare.length})</span>
+                        </span>
+                    )}
+                </div>
             </div>
             
             {payslips.length === 0 ? (
@@ -67,7 +81,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                 <>
                 {selectedForCompare.length < 2 && (
                     <p className="text-sm text-gray-500 mb-3 italic">
-                        Seleziona da 2 a 12 buste paga usando le caselle a sinistra per confrontarle
+                        Seleziona almeno 2 buste paga usando le caselle a sinistra per confrontarle
                     </p>
                 )}
                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
@@ -82,11 +96,7 @@ const Archive: React.FC<ArchiveProps> = ({ payslips, onSelectPayslip, onCompare,
                                         aria-label={`Seleziona per confronto: ${getMonthName(p.period.month)} ${p.period.year}`}
                                         className="h-5 w-5 sm:h-6 sm:w-6 rounded border-2 border-gray-400 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 flex-shrink-0"
                                         checked={selectedForCompare.includes(p.id)}
-                                        onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleCompareSelection(p.id);
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={() => toggleCompareSelection(p.id)}
                                     />
                                     <div className="ml-3 sm:ml-4 flex-grow">
                                         <p className="font-bold text-base sm:text-lg text-gray-800 capitalize">

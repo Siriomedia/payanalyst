@@ -42,7 +42,7 @@ const Compare: React.FC<CompareProps> = ({ payslips, handleCreditConsumption }) 
         return (
             <div className="text-center p-4 sm:p-6 md:p-8 bg-white rounded-xl shadow-md">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Seleziona Buste Paga</h1>
-                <p className="text-sm sm:text-base text-gray-600">Vai all'archivio per selezionare da 2 a 12 buste paga da confrontare.</p>
+                <p className="text-sm sm:text-base text-gray-600">Vai all'archivio per selezionare almeno 2 buste paga da confrontare.</p>
             </div>
         );
     }
