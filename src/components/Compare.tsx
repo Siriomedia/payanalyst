@@ -1,42 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Payslip } from '../types.ts';
 import { getComparisonAnalysis } from '../services/geminiService.ts';
 import Spinner from './common/Spinner.tsx';
 import Assistant from './Assistant.tsx';
-import { CREDIT_COSTS } from '../config/plans.ts';
 
 interface CompareProps {
     payslips: Payslip[] | null;
-    handleCreditConsumption: (cost: number) => boolean;
 }
 
-const Compare: React.FC<CompareProps> = ({ payslips, handleCreditConsumption }) => {
+const Compare: React.FC<CompareProps> = ({ payslips }) => {
     const [analysis, setAnalysis] = useState<string | null>(null);
     const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
     const [analysisError, setAnalysisError] = useState<string | null>(null);
 
     const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
 
-    const handleStartAnalysis = async () => {
-        if (!payslips || payslips.length < 2) return;
+    useEffect(() => {
+        if (payslips && payslips.length >= 2) {
+            setIsAnalysisLoading(true);
+            setAnalysis(null);
+            setAnalysisError(null);
 
-        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
-        if (!canProceed) return;
-
-        setIsAnalysisLoading(true);
-        setAnalysis(null);
-        setAnalysisError(null);
-
-        try {
-            const result = await getComparisonAnalysis(payslips);
-            setAnalysis(result);
-        } catch (err) {
-            console.error("Analysis failed:", err);
-            setAnalysisError("Impossibile generare l'analisi comparativa. Riprova più tardi.");
-        } finally {
-            setIsAnalysisLoading(false);
+            getComparisonAnalysis(payslips)
+                .then(result => {
+                    setAnalysis(result);
+                })
+                .catch(err => {
+                    console.error("Analysis failed:", err);
+                    setAnalysisError("Impossibile generare l'analisi comparativa. Riprova più tardi.");
+                })
+                .finally(() => {
+                    setIsAnalysisLoading(false);
+                });
         }
-    };
+    }, [payslips]);
 
     if (!payslips || payslips.length < 2) {
         return (
@@ -88,43 +85,16 @@ const Compare: React.FC<CompareProps> = ({ payslips, handleCreditConsumption }) 
             {/* AI Analysis Section */}
             <div className="mb-6 sm:mb-8 bg-white p-4 sm:p-6 rounded-xl shadow-md">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-                    Analisi AI Comparativa
+                    Analisi AI
                 </h2>
-
-                {!analysis && !isAnalysisLoading && (
-                    <div>
-                        <p className="text-gray-600 text-sm sm:text-base mb-4">
-                            Vuoi un'analisi dettagliata delle differenze tra le buste paga selezionate?
-                        </p>
-                        <button
-                            onClick={handleStartAnalysis}
-                            className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-md text-sm sm:text-base"
-                        >
-                            Avvia Analisi Comparativa ({CREDIT_COSTS.COMPARISON_ANALYSIS} crediti)
-                        </button>
-                    </div>
-                )}
-
                 {isAnalysisLoading && (
                     <div className="flex items-center space-x-2 text-gray-600 text-sm sm:text-base">
                         <Spinner />
                         <span>Sto analizzando le differenze...</span>
                     </div>
                 )}
-
                 {analysisError && <p className="text-red-600 text-sm sm:text-base">{analysisError}</p>}
-
-                {analysis && (
-                    <div>
-                        <p className="text-gray-700 whitespace-pre-wrap text-sm sm:text-base mb-4">{analysis}</p>
-                        <button
-                            onClick={() => setAnalysis(null)}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors text-sm"
-                        >
-                            Chiudi Analisi
-                        </button>
-                    </div>
-                )}
+                {analysis && <p className="text-gray-700 whitespace-pre-wrap text-sm sm:text-base">{analysis}</p>}
             </div>
 
             <div className="bg-white rounded-xl shadow-md overflow-hidden mb-6 sm:mb-8">
@@ -193,21 +163,8 @@ const Compare: React.FC<CompareProps> = ({ payslips, handleCreditConsumption }) 
                     </table>
                 </div>
             </div>
-
-            {/* Assistant Section */}
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-3 sm:mb-4">
-                    Assistente per il Confronto
-                </h2>
-                <p className="text-gray-600 text-sm sm:text-base mb-4">
-                    Hai domande specifiche sul confronto delle buste paga? Chiedi all'assistente!
-                </p>
-                <Assistant
-                    payslips={payslips}
-                    mode="comparison"
-                    handleCreditConsumption={handleCreditConsumption}
-                />
-            </div>
+            
+            {/* The assistant is removed from here as it doesn't make sense to pass the credit handler down */}
         </div>
     );
 };

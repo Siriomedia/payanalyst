@@ -6,8 +6,8 @@ import Spinner from './common/Spinner.tsx';
 import { CREDIT_COSTS } from '../config/plans.ts';
 
 interface AssistantProps {
-    payslips: Payslip[] | Payslip[];
-    mode: 'general' | 'contextual' | 'comparison';
+    payslips: Payslip[];
+    mode: 'general' | 'contextual';
     focusedPayslip?: Payslip | null;
     payslipsToCompare?: [Payslip, Payslip] | null;
     handleCreditConsumption: (cost: number) => boolean;
@@ -31,16 +31,16 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
     
     // Clear chat when focused payslip or comparison context changes
     useEffect(() => {
-        if (mode === 'contextual' || mode === 'comparison') {
+        if (mode === 'contextual') {
             setMessages([]);
         }
-    }, [focusedPayslip, payslipsToCompare, mode, payslips]);
+    }, [focusedPayslip, payslipsToCompare, mode]);
 
 
     const handleSend = async () => {
         if (input.trim() === '' || isLoading) return;
 
-        const isComplex = (attachment || includeTaxTables || mode === 'contextual' || mode === 'comparison');
+        const isComplex = (attachment || includeTaxTables || mode === 'contextual');
         const cost = isComplex ? CREDIT_COSTS.ASSISTANT_COMPLEX : CREDIT_COSTS.ASSISTANT_SIMPLE;
 
         if (!handleCreditConsumption(cost)) {
@@ -49,7 +49,7 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
 
         const userMessage: ChatMessage = { id: `msg-${Date.now()}`, text: input, sender: 'user' };
         const history = [...messages];
-
+        
         setMessages(prev => [...prev, userMessage]);
         const currentInput = input;
         const currentAttachment = attachment;
@@ -57,14 +57,9 @@ const Assistant: React.FC<AssistantProps> = ({ payslips, mode, focusedPayslip, p
         setAttachment(null);
         setIsLoading(true);
 
-        let context;
-        if (mode === 'comparison') {
-            context = { payslipsToCompare: payslips };
-        } else if (mode === 'contextual') {
-            context = { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare };
-        } else {
-            context = { payslips, file: currentAttachment, includeTaxTables };
-        }
+        const context = mode === 'general' 
+            ? { payslips, file: currentAttachment, includeTaxTables }
+            : { focusedPayslip: focusedPayslip, payslipsToCompare: payslipsToCompare };
 
         try {
             const stream = await getChatResponse(history, currentInput, context);

@@ -1078,7 +1078,7 @@ Codice F00880 "Rimborsi da 730":
         const payslipData = JSON.parse(jsonStr);
 
         if (!payslipData.id) {
-            payslipData.id = `payslip-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            payslipData.id = `payslip-${Date.now()}-${Math.random()}`;
         }
 
         return payslipData as Payslip;
@@ -1139,7 +1139,7 @@ export const getChatResponse = async (
         payslips?: Payslip[];
         file?: File;
         focusedPayslip?: Payslip | null;
-        payslipsToCompare?: Payslip[] | [Payslip, Payslip] | null;
+        payslipsToCompare?: [Payslip, Payslip] | null;
         includeTaxTables?: boolean;
     }
 ) => {
@@ -1246,12 +1246,9 @@ Chiudi sempre chiedendo se l'utente vuole approfondire qualcosa o ha altre doman
 
 Se non hai un dato specifico nella busta paga, dillo chiaramente e spiega dove può trovarlo o come può calcolarlo.`;
 
-    if (context.payslipsToCompare && context.payslipsToCompare.length > 0) {
-        const getMonthName = (month: number) => new Date(2000, month - 1, 1).toLocaleString('it-IT', { month: 'long' });
-        const payslipsText = context.payslipsToCompare.map((p, idx) =>
-            `Busta Paga ${idx + 1} (${getMonthName(p.period.month)} ${p.period.year}):\n${JSON.stringify(p, null, 2)}`
-        ).join('\n\n');
-        systemInstruction += `\nL'utente sta confrontando ${context.payslipsToCompare.length} buste paga. Basa le tue risposte su di esse, usandole come contesto primario:\n\n${payslipsText}`;
+    if (context.payslipsToCompare) {
+        const [p1, p2] = context.payslipsToCompare;
+        systemInstruction += `\nL'utente sta confrontando queste due buste paga. Basa le tue risposte su di esse, usandole come contesto primario:\nBusta Paga 1: ${JSON.stringify(p1, null, 2)}\nBusta Paga 2: ${JSON.stringify(p2, null, 2)}`;
     } else if (context.focusedPayslip) {
         systemInstruction += `\nL'utente sta visualizzando questa busta paga. Basa le tue risposte principalmente su di essa, usandola come contesto primario:\n${JSON.stringify(context.focusedPayslip, null, 2)}`;
     } else if (context.payslips && context.payslips.length > 0) {

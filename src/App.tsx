@@ -18,7 +18,6 @@ import PayrollReference from './components/PayrollReference.tsx';
 import { View, Payslip, User, Shift, LeavePlan, Absence, Plan } from './types.ts';
 import { PLANS, CREDIT_COSTS } from './config/plans.ts';
 import { normalizeTimestamp } from './utils/timestampHelpers.ts';
-import { getUserPayslips, deletePayslipFromDatabase, migrateLocalPayslipsToDatabase, savePayslipToDatabase } from './services/payslipService.ts';
 
 // FIREBASE
 import { auth, db } from "./firebase.ts";
@@ -241,51 +240,12 @@ const App: React.FC = () => {
     }, [user]);
 
     //
-    // PAYSLIPS FROM DATABASE
+    // LOCAL DATA
     //
-    const [payslips, setPayslips] = useState<Payslip[]>([]);
-    const [payslipsLoading, setPayslipsLoading] = useState(true);
-
-    // Carica buste paga dal database quando l'utente è autenticato
-    useEffect(() => {
-        const loadPayslips = async () => {
-            if (!auth.currentUser || !user) {
-                setPayslipsLoading(false);
-                return;
-            }
-
-            // Usa l'ID del sistema (user.id), non il Firebase UID
-            const userIdToUse = user.id || auth.currentUser.uid;
-            console.log('📥 Caricamento iniziale buste paga per userId:', userIdToUse);
-
-            // Carica dal database
-            const { payslips: dbPayslips } = await getUserPayslips(userIdToUse);
-            console.log('📥 Caricate', dbPayslips.length, 'buste paga dal database');
-
-            // Migra buste paga da localStorage se esistono
-            try {
-                const localPayslips = JSON.parse(localStorage.getItem("gioia_payslips") || "[]");
-                if (localPayslips.length > 0) {
-                    console.log('Migrazione buste paga da localStorage...', localPayslips.length, 'buste paga');
-                    await migrateLocalPayslipsToDatabase(userIdToUse, localPayslips);
-                    localStorage.removeItem("gioia_payslips");
-
-                    // Ricarica dal database dopo la migrazione
-                    const { payslips: updatedPayslips } = await getUserPayslips(userIdToUse);
-                    setPayslips(updatedPayslips);
-                } else {
-                    setPayslips(dbPayslips);
-                }
-            } catch (error) {
-                console.error('Errore durante la migrazione:', error);
-                setPayslips(dbPayslips);
-            }
-
-            setPayslipsLoading(false);
-        };
-
-        loadPayslips();
-    }, [auth.currentUser?.uid, user?.id]);
+    const [payslips, setPayslips] = useState<Payslip[]>(() => {
+        try { return JSON.parse(localStorage.getItem("gioia_payslips") || "[]"); }
+        catch { return []; }
+    });
 
     const [shifts, setShifts] = useState<Shift[]>(() => {
         try { return JSON.parse(localStorage.getItem("gioia_shifts") || "[]"); }
@@ -323,6 +283,10 @@ const App: React.FC = () => {
     //
     // PERSIST LOCAL DATA TO LOCALSTORAGE
     //
+    useEffect(() => {
+        localStorage.setItem("gioia_payslips", JSON.stringify(payslips));
+    }, [payslips]);
+
     useEffect(() => {
         localStorage.setItem("gioia_shifts", JSON.stringify(shifts));
     }, [shifts]);
@@ -416,7 +380,7 @@ const App: React.FC = () => {
     //
     // ANALYSIS COMPLETE - VERIFICA CORRISPONDENZA DATI ANAGRAFICI
     //
-    const handleAnalysisComplete = async (newPayslip: Payslip) => {
+    const handleAnalysisComplete = (newPayslip: Payslip) => {
         console.log('======================================');
         console.log('CHIAMATA handleAnalysisComplete');
         console.log('Busta paga - Nome:', newPayslip.employee.firstName, 'Cognome:', newPayslip.employee.lastName);
@@ -427,24 +391,15 @@ const App: React.FC = () => {
         setSelectedPayslip(newPayslip);
 
         // Admin bypassa tutti i controlli
-        if (user && user.role === "admin" && auth.currentUser) {
+        if (user && user.role === "admin") {
             console.log('🔑 UTENTE ADMIN: Bypassa controlli e salva sempre');
-            console.log('🔑 Firebase Auth UID:', auth.currentUser.uid);
-            console.log('👤 User ID nel sistema:', user.id);
-
-            // Salva la busta paga nel database usando l'ID del sistema, non Firebase UID
-            const userIdToUse = user.id || auth.currentUser.uid;
-            console.log('💾 Salvataggio con userId:', userIdToUse);
-
-            const saveResult = await savePayslipToDatabase(userIdToUse, newPayslip);
-            if (saveResult.success) {
-                // Ricarica le buste paga dal database
-                await reloadPayslips();
-                console.log('✅ Admin: Busta paga salvata. Archivio aggiornato dal database');
-            } else {
-                console.error('❌ Errore salvataggio:', saveResult.error);
-            }
-
+            const updated = [...payslips, newPayslip].sort((a, b) => {
+                const dA = new Date(a.period.year, a.period.month - 1);
+                const dB = new Date(b.period.year, b.period.month - 1);
+                return dB.getTime() - dA.getTime();
+            });
+            setPayslips(updated);
+            console.log('✅ Admin: Busta paga salvata. Archivio contiene', updated.length, 'buste paga');
             setAlert(null);
             setCurrentView(View.Dashboard);
             return;
@@ -555,26 +510,17 @@ const App: React.FC = () => {
         console.log('Cognome corrisponde?', lastNameMatch);
         console.log('Risultato finale - Salva in archivio?', nameMatches);
 
-        if (nameMatches && auth.currentUser) {
+        if (nameMatches) {
             // DATI CORRISPONDENTI → Salva busta paga
             console.log('✅ SALVATAGGIO IN ARCHIVIO: Nome e cognome corrispondono');
-            console.log('🔑 Firebase Auth UID:', auth.currentUser.uid);
-            console.log('👤 User ID nel sistema:', user?.id);
-
-            // Salva la busta paga nel database usando l'ID del sistema, non Firebase UID
-            const userIdToUse = user?.id || auth.currentUser.uid;
-            console.log('💾 Salvataggio con userId:', userIdToUse);
-
-            const saveResult = await savePayslipToDatabase(userIdToUse, newPayslip);
-            if (saveResult.success) {
-                // Ricarica le buste paga dal database
-                await reloadPayslips();
-                console.log('✅ Busta paga salvata. Archivio aggiornato dal database');
-                setAlert(null);
-            } else {
-                console.error('❌ Errore salvataggio:', saveResult.error);
-                setAlert('Errore nel salvataggio della busta paga. Riprova.');
-            }
+            const updated = [...payslips, newPayslip].sort((a, b) => {
+                const dA = new Date(a.period.year, a.period.month - 1);
+                const dB = new Date(b.period.year, b.period.month - 1);
+                return dB.getTime() - dA.getTime();
+            });
+            setPayslips(updated);
+            console.log('✅ Busta paga salvata. Archivio ora contiene', updated.length, 'buste paga');
+            setAlert(null);
         } else {
             // DATI NON CORRISPONDENTI → Solo analisi temporanea, NON salvare
             console.log('❌ NON SALVATO: Nome e/o cognome NON corrispondono');
@@ -598,21 +544,22 @@ const App: React.FC = () => {
     //
     // DELETE PAYSLIP FROM ARCHIVE
     //
-    const handleDeletePayslip = async (payslipId: string) => {
-        // Rimuovi dal database
-        const result = await deletePayslipFromDatabase(payslipId);
-        if (result.success) {
-            // Aggiorna lo stato locale
-            setPayslips(prev => prev.filter(p => p.id !== payslipId));
-        } else {
-            console.error('Errore nella cancellazione:', result.error);
-        }
+    const handleDeletePayslip = (payslipId: string) => {
+        setPayslips(prev => {
+            const updated = prev.filter(p => p.id !== payslipId);
+            return updated;
+        });
     };
 
     //
     // COMPARE PAYSLIPS - Navigate to Compare view
     //
     const handleComparePayslips = (payslipsToCompareArr: Payslip[]) => {
+        const canProceed = handleCreditConsumption(CREDIT_COSTS.COMPARISON_ANALYSIS);
+        if (!canProceed) {
+            return;
+        }
+
         setPayslipsToCompare(payslipsToCompareArr);
 
         setTimeout(() => {
@@ -635,24 +582,6 @@ const App: React.FC = () => {
 
         const userRef = doc(db, "users", auth.currentUser.uid);
         await setDoc(userRef, updatedData, { merge: true });
-    };
-
-    //
-    // RELOAD PAYSLIPS FROM DATABASE
-    //
-    const reloadPayslips = async () => {
-        if (auth.currentUser && user) {
-            // Usa l'ID del sistema (user.id), non il Firebase UID
-            const userIdToUse = user.id || auth.currentUser.uid;
-            console.log('🔄 Ricaricamento buste paga per userId:', userIdToUse);
-            const { payslips: dbPayslips, error } = await getUserPayslips(userIdToUse);
-            if (error) {
-                console.error('❌ Errore nel caricamento delle buste paga:', error);
-            } else {
-                console.log('✅ Caricate', dbPayslips.length, 'buste paga dal database');
-            }
-            setPayslips(dbPayslips);
-        }
     };
 
     //
@@ -720,7 +649,7 @@ const App: React.FC = () => {
                                 />
                             );
                         case View.Compare:
-                            return <Compare payslips={payslipsToCompare} handleCreditConsumption={handleCreditConsumption} />;
+                            return <Compare payslips={payslipsToCompare} />;
                         case View.Assistant:
                             return (
                                 <Assistant
