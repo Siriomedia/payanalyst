@@ -59,14 +59,13 @@ const Compare: React.FC<CompareProps> = ({ payslips, handleCreditConsumption }) 
                 <td className="py-3 sm:py-4 px-3 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base sticky left-0 bg-white z-10">{label}</td>
                 {values.map((val, idx) => {
                     const diff = diffs[idx];
-                    const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-700';
                     const diffSign = diff > 0 ? '+' : '';
                     const showDiff = idx > 0 && diff !== 0;
 
                     return (
-                        <td key={idx} className={`py-3 sm:py-4 px-3 sm:px-4 text-center font-mono text-sm sm:text-base whitespace-nowrap ${diffColor}`}>
+                        <td key={idx} className="py-3 sm:py-4 px-3 sm:px-4 text-center font-mono text-sm sm:text-base whitespace-nowrap text-gray-700">
                             <div>{formatValue(val)}</div>
-                            {showDiff && <div className="text-xs">{diffSign}{formatValue(diff)}</div>}
+                            {showDiff && <div className="text-xs text-gray-700">{diffSign}{formatValue(diff)}</div>}
                         </td>
                     );
                 })}
